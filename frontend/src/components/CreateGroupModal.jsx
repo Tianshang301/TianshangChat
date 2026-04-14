@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { SERVER_URL } from '../config';
 
 function CreateGroupModal({ users, currentUser, onClose, onCreate }) {
   const { t } = useLanguage();
@@ -52,7 +53,7 @@ function CreateGroupModal({ users, currentUser, onClose, onCreate }) {
                   onClick={() => toggleUser(user.id)}
                 >
                   {user.avatar ? (
-                    <img src={`http://localhost:3000${user.avatar}`} alt="" className="select-avatar" />
+                    <img src={`${SERVER_URL}${user.avatar}`} alt="" className="select-avatar" />
                   ) : (
                     <div className="select-avatar-placeholder">{user.username?.charAt(0).toUpperCase()}</div>
                   )}

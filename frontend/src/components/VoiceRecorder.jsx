@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config';
 
 function VoiceRecorder({ onSendVoice }) {
   const { t } = useLanguage();
@@ -50,7 +51,7 @@ function VoiceRecorder({ onSendVoice }) {
     formData.append('voice', blob, 'voice.webm');
 
     try {
-      const response = await fetch('http://localhost:3000/api/upload/voice', {
+      const response = await fetch(`${API_URL}/upload/voice`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`

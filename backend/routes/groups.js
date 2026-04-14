@@ -282,6 +282,35 @@ router.post('/:id/transfer', authMiddleware, (req, res) => {
   }
 });
 
+router.post('/:id/join', authMiddleware, (req, res) => {
+  try {
+    const groupId = parseInt(req.params.id);
+    const group = Group.findById(groupId);
+    
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+
+    if (Group.isMember(groupId, req.user.id)) {
+      return res.status(400).json({ error: 'Already in this group' });
+    }
+
+    if (Group.isFull(groupId)) {
+      return res.status(400).json({ error: 'Group is full' });
+    }
+
+    Group.addMember(groupId, req.user.id);
+    
+    res.json({
+      success: true,
+      group: Group.findById(groupId)
+    });
+  } catch (error) {
+    console.error('Join group error:', error);
+    res.status(500).json({ error: 'Failed to join group' });
+  }
+});
+
 router.post('/:id/leave', authMiddleware, (req, res) => {
   try {
     const groupId = parseInt(req.params.id);

@@ -5,11 +5,13 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const jwt = require('jsonwebtoken');
+const os = require('os');
 
 const authRoutes = require('./routes/auth');
 const uploadRoutes = require('./routes/upload');
 const messageRoutes = require('./routes/messages');
 const groupRoutes = require('./routes/groups');
+const userRoutes = require('./routes/users');
 const Message = require('./models/Message');
 const User = require('./models/User');
 const Group = require('./models/Group');
@@ -21,23 +23,103 @@ const app = express();
 const server = http.createServer(app);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'TianshangChatSecretKey2024';
+const PORT = process.env.PORT || 3000;
+
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
+
+const localIP = getLocalIP();
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (origin === 'null') return true;
+  if (origin.startsWith('file://')) return true;
+  
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return true;
+    }
+    
+    if (hostname === localIP) {
+      return true;
+    }
+    
+    if (hostname.match(/^192\.168\.\d+\.\d+$/) || 
+        hostname.match(/^10\.\d+\.\d+\.\d+$/) ||
+        hostname.match(/^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/)) {
+      return true;
+    }
+    
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+      } else {
+        console.log('CORS blocked origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST'],
     credentials: true
   }
 });
 
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path} from ${req.headers.origin}`);
+  next();
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
+app.use('/api/users', userRoutes);
+
+app.get('/api/server-info', (req, res) => {
+  res.json({
+    success: true,
+    lanIp: localIP,
+    port: PORT,
+    onlineUsers: onlineUsers.size
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 const onlineUsers = new Map();
 const userSockets = new Map();
@@ -488,7 +570,6 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT} (LAN IP: ${localIP})`);
 });

@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getServerUrl } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
+const isAndroid = typeof window !== 'undefined' && window.Capacitor !== undefined;
+const PORT = 3000;
+
 function RegisterForm({ onSwitchToLogin }) {
-  const { register, error, clearError } = useAuth();
+  const { register, error, clearError, serverIp, setServerIp, updateServerUrl } = useAuth();
   const { t, language, setLanguage, languages, languageNames } = useLanguage();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [localServerIp, setLocalServerIp] = useState(serverIp);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,6 +33,12 @@ function RegisterForm({ onSwitchToLogin }) {
     if (username.length < 3) {
       setLocalError(t('usernameTooShort'));
       return;
+    }
+
+    if (isAndroid && localServerIp) {
+      const newUrl = `http://${localServerIp}:${PORT}`;
+      updateServerUrl(newUrl);
+      setServerIp(localServerIp);
     }
 
     setLoading(true);
@@ -87,6 +97,18 @@ function RegisterForm({ onSwitchToLogin }) {
           {t('login')}
         </button>
       </div>
+      {isAndroid && (
+        <div className="server-ip-section">
+          <label className="server-ip-label">{t('serverIp') || 'Server IP'}:</label>
+          <input
+            type="text"
+            className="auth-input server-ip-input"
+            placeholder={t('enterServerIp') || 'Enter server IP (e.g. 192.168.1.100)'}
+            value={localServerIp}
+            onChange={(e) => setLocalServerIp(e.target.value)}
+          />
+        </div>
+      )}
       <div className="language-selector-welcome">
         {languages.map((lang) => (
           <button

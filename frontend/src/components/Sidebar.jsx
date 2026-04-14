@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import UserAvatar from './UserAvatar';
 import { useLanguage } from '../context/LanguageContext';
+import { SERVER_URL } from '../config';
 
 function Sidebar({ users = [], currentUser, onJoin, onAvatarUpdate, socket }) {
   const { t, language, setLanguage, languages, languageNames } = useLanguage();
@@ -62,7 +63,7 @@ function Sidebar({ users = [], currentUser, onJoin, onAvatarUpdate, socket }) {
             <span className="online-indicator"></span>
             {user.avatar ? (
               <img
-                src={`http://localhost:3000${user.avatar}`}
+                src={`${SERVER_URL}${user.avatar}`}
                 alt={user.username}
                 className="message-avatar"
                 style={{ width: 32, height: 32 }}

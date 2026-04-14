@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { SERVER_URL, API_URL } from '../config';
 
 function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, onTyping, onOpenSettings }) {
   const { t } = useLanguage();
@@ -74,7 +75,7 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
     const formData = new FormData();
     formData.append('voice', blob, 'voice.webm');
     try {
-      const response = await fetch('http://localhost:3000/api/upload/voice', {
+      const response = await fetch(`${API_URL}/upload/voice`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
         body: formData
@@ -110,7 +111,7 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
           >
             {msg.senderId !== currentUser?.id && (
               msg.senderAvatar ? (
-                <img src={`http://localhost:3000${msg.senderAvatar}`} alt="" className="message-avatar" />
+                <img src={`${SERVER_URL}${msg.senderAvatar}`} alt="" className="message-avatar" />
               ) : (
                 <div className="message-avatar">{msg.senderName?.charAt(0).toUpperCase()}</div>
               )
@@ -122,7 +123,7 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
               {msg.type === 'voice' ? (
                 <div className="voice-message">
                   <button className="voice-btn" onClick={() => {
-                    const audio = new Audio(`http://localhost:3000${msg.audioUrl}`);
+                    const audio = new Audio(`${SERVER_URL}${msg.audioUrl}`);
                     audio.play();
                   }}>▶</button>
                   <span>{msg.duration}</span>

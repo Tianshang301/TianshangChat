@@ -1,43 +1,95 @@
 {
-  "name": "tianshangchat-electron",
+  "name": "tianshangchat-desktop",
   "version": "1.0.0",
-  "description": "Electron packaging for Tianshang",
+  "description": "TianshangChat - Real-time chat application",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder",
-    "dist:win": "electron-builder --win"
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:all": "electron-builder --win --mac"
   },
+  "author": "Tianshang",
+  "license": "MIT",
   "build": {
     "appId": "com.tianshang.chat",
-    "productName": "Tianshang",
+    "productName": "TianshangChat",
+    "copyright": "Copyright © 2024 Tianshang",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "."
     },
     "files": [
       "main.js",
       "preload.js",
-      "../frontend/dist/**/*"
+      "node_modules/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "../frontend/dist",
+        "to": "dist",
+        "filter": ["**/*"]
+      }
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/electron-updater/**/*"
+    ],
+    "extraMetadata": {
+      "main": "main.js"
+    },
     "win": {
       "target": [
         {
           "target": "nsis",
           "arch": ["x64"]
         }
-      ],
-      "icon": "icon.ico"
+      ]
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "icon.ico",
-      "uninstallerIcon": "icon.ico",
-      "installerHeaderIcon": "icon.ico",
+      "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Tianshang"
+      "shortcutName": "TianshangChat"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.social-networking",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "YOUR_GITHUB_USERNAME",
+      "repo": "TianshangChat"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.0"
   },
   "devDependencies": {
     "electron": "^28.0.0",

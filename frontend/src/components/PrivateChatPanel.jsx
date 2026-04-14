@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { SERVER_URL, API_URL } from '../config';
 
 function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSendVoice, onTyping, onClose, typingUser }) {
   const { t } = useLanguage();
@@ -74,7 +75,7 @@ function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSend
     const formData = new FormData();
     formData.append('voice', blob, 'voice.webm');
     try {
-      const response = await fetch('http://localhost:3000/api/upload/voice', {
+      const response = await fetch(`${API_URL}/upload/voice`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
         body: formData
@@ -94,7 +95,7 @@ function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSend
       <div className="panel-header">
         <div className="user-info-header">
           {user.avatar ? (
-            <img src={`http://localhost:3000${user.avatar}`} alt="" className="panel-avatar" />
+            <img src={`${SERVER_URL}${user.avatar}`} alt="" className="panel-avatar" />
           ) : (
             <div className="panel-avatar-placeholder">{user.username?.charAt(0).toUpperCase()}</div>
           )}
@@ -113,7 +114,7 @@ function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSend
               {msg.type === 'voice' ? (
                 <div className="voice-message">
                   <button className="voice-btn" onClick={() => {
-                    const audio = new Audio(`http://localhost:3000${msg.audioUrl}`);
+                    const audio = new Audio(`${SERVER_URL}${msg.audioUrl}`);
                     audio.play();
                   }}>▶</button>
                   <span>{msg.duration}</span>

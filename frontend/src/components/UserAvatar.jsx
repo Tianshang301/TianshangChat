@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { SERVER_URL, API_URL } from '../config';
 
 function UserAvatar({ currentUser, onAvatarUpdate }) {
   const { t } = useLanguage();
@@ -24,7 +25,7 @@ function UserAvatar({ currentUser, onAvatarUpdate }) {
     formData.append('avatar', file);
 
     try {
-      const response = await fetch('http://localhost:3000/api/upload/avatar', {
+      const response = await fetch(`${API_URL}/upload/avatar`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -45,7 +46,7 @@ function UserAvatar({ currentUser, onAvatarUpdate }) {
       <div className="avatar-upload">
         {currentUser?.avatar ? (
           <img
-            src={`http://localhost:3000${currentUser.avatar}`}
+            src={`${SERVER_URL}${currentUser.avatar}`}
             alt="Your avatar"
             className="avatar-preview"
             onClick={handleAvatarClick}

@@ -1,15 +1,53 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { encryptPassword, validatePassword, validateUsername } from '../utils/crypto';
 
-const API_URL = 'http://localhost:3000/api';
-
 const AuthContext = createContext();
+
+const PORT = 3000;
+
+const getServerUrl = (serverIp) => {
+  if (serverIp) {
+    return `http://${serverIp}:${PORT}`;
+  }
+  
+  const hostname = window.location.hostname;
+  
+  if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1' || hostname === 'file') {
+    return `http://127.0.0.1:${PORT}`;
+  }
+  
+  return `http://${hostname}:${PORT}`;
+};
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [serverIp, setServerIpState] = useState(() => localStorage.getItem('serverIp') || '');
+  const serverUrlRef = useRef(getServerUrl(localStorage.getItem('serverIp')));
+  const [connectionType, setConnectionType] = useState('localhost');
+
+  const setServerIp = (ip) => {
+    setServerIpState(ip);
+    localStorage.setItem('serverIp', ip);
+    serverUrlRef.current = getServerUrl(ip);
+  };
+
+  const updateServerUrl = (url) => {
+    serverUrlRef.current = url;
+  };
+
+  const getServerUrlSync = () => serverUrlRef.current;
+
+  useEffect(() => {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      setConnectionType('localhost');
+    } else {
+      setConnectionType('lan');
+    }
+  }, []);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
@@ -22,14 +60,14 @@ export function AuthProvider({ children }) {
 
   const verifyToken = async (authToken) => {
     try {
-      const response = await fetch(`${API_URL}/auth/verify`, {
+      const response = await fetch(`${serverUrlRef.current}/api/auth/verify`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
       });
       const data = await response.json();
       if (data.success) {
-        const userResponse = await fetch(`${API_URL}/auth/user`, {
+        const userResponse = await fetch(`${serverUrlRef.current}/api/auth/user`, {
           headers: {
             'Authorization': `Bearer ${authToken}`
           }
@@ -70,7 +108,7 @@ export function AuthProvider({ children }) {
     const encryptedPassword = encryptPassword(password);
 
     try {
-      const response = await fetch(`${API_URL}/auth/register`, {
+      const response = await fetch(`${serverUrlRef.current}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -100,9 +138,12 @@ export function AuthProvider({ children }) {
     setError(null);
     
     const encryptedPassword = encryptPassword(password);
+    const loginUrl = `${serverUrlRef.current}/api/auth/login`;
+    console.log('[DEBUG] Login URL:', loginUrl);
+    console.log('[DEBUG] serverUrlRef.current:', serverUrlRef.current);
 
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(loginUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -126,7 +167,8 @@ export function AuthProvider({ children }) {
       }
     } catch (err) {
       console.error('Login error:', err);
-      const errorMsg = 'Login failed. Please try again.';
+      console.log('[DEBUG] Fetch error details:', err.message, err.name);
+      const errorMsg = 'Login failed. Please try again. (' + err.message + ')';
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -135,7 +177,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     if (token) {
       try {
-        await fetch(`${API_URL}/auth/logout`, {
+        await fetch(`${serverUrlRef.current}/api/auth/logout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -163,6 +205,12 @@ export function AuthProvider({ children }) {
     token,
     loading,
     error,
+    serverUrl: serverUrlRef.current,
+    serverIp,
+    setServerIp,
+    updateServerUrl,
+    getServerUrlSync,
+    connectionType,
     register,
     login,
     logout,
@@ -185,3 +233,5 @@ export function useAuth() {
   }
   return context;
 }
+
+export { getServerUrl };

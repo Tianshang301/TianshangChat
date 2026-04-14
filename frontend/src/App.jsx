@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider, useAuth, getServerUrl } from './context/AuthContext';
 import UserList from './components/UserList';
 import GroupList from './components/GroupList';
 import PrivateChatPanel from './components/PrivateChatPanel';
@@ -9,9 +9,14 @@ import CreateGroupModal from './components/CreateGroupModal';
 import GroupSettingsModal from './components/GroupSettingsModal';
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
+import BottomNav from './components/BottomNav';
+import UserSearchModal from './components/UserSearchModal';
+import JoinGroupModal from './components/JoinGroupModal';
+import RecentChats from './components/RecentChats';
+import { showNotification } from './utils/notifications';
 import io from 'socket.io-client';
 
-const API_URL = 'http://localhost:3000/api';
+const isAndroid = typeof window !== 'undefined' && window.Capacitor !== undefined;
 
 function AuthScreen() {
   const [authMode, setAuthMode] = useState('login');
@@ -35,7 +40,7 @@ function ChatLayout({
   onAddGroupMember, onRemoveGroupMember, onSetAdmin, onTransferOwner, onLeaveGroup, onDeleteGroup
 }) {
   const { t, language, setLanguage, languages, languageNames } = useLanguage();
-  const { logout } = useAuth();
+  const { logout, connectionType } = useAuth();
 
   return (
     <div className="app-container">
@@ -43,6 +48,11 @@ function ChatLayout({
         <div className="sidebar-header">
           <h2>{t('appName')}</h2>
           <UserAvatar currentUser={currentUser} />
+          <div className="connection-type-indicator">
+            <span className={`connection-badge ${connectionType}`}>
+              {connectionType === 'lan' ? '🌐 LAN' : '💻 Local'}
+            </span>
+          </div>
           <div className="language-selector">
             {languages.map((lang) => (
               <button
@@ -136,7 +146,7 @@ function ChatLayout({
 }
 
 function UserAvatar({ currentUser }) {
-  const { token } = useAuth();
+  const { token, serverUrl } = useAuth();
   const fileInputRef = useRef(null);
 
   const handleFileChange = async (e) => {
@@ -145,7 +155,7 @@ function UserAvatar({ currentUser }) {
     const formData = new FormData();
     formData.append('avatar', file);
     try {
-      const response = await fetch(`${API_URL}/upload/avatar`, {
+      const response = await fetch(`${serverUrl}/api/upload/avatar`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -163,7 +173,7 @@ function UserAvatar({ currentUser }) {
     <div className="user-info">
       <div onClick={() => fileInputRef.current?.click()}>
         {currentUser?.avatar ? (
-          <img src={`http://localhost:3000${currentUser.avatar}`} alt="" className="avatar-preview" />
+          <img src={`${serverUrl}${currentUser.avatar}`} alt="" className="avatar-preview" />
         ) : (
           <div className="avatar-upload-btn">
             <span>📷</span>
@@ -177,6 +187,7 @@ function UserAvatar({ currentUser }) {
 }
 
 function PublicMessageList({ messages, currentUserId }) {
+  const { serverUrl } = useAuth();
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -190,7 +201,7 @@ function PublicMessageList({ messages, currentUserId }) {
       {messages.map((msg) => (
         <div key={msg.id} className={`message ${msg.senderId === currentUserId ? 'own' : ''}`}>
           {msg.senderAvatar ? (
-            <img src={`http://localhost:3000${msg.senderAvatar}`} alt="" className="message-avatar" />
+            <img src={`${serverUrl}${msg.senderAvatar}`} alt="" className="message-avatar" />
           ) : (
             <div className="message-avatar">{msg.senderName?.charAt(0).toUpperCase()}</div>
           )}
@@ -198,7 +209,7 @@ function PublicMessageList({ messages, currentUserId }) {
             {msg.senderId !== currentUserId && <div className="message-sender">{msg.senderName}</div>}
             {msg.type === 'voice' ? (
               <div className="voice-message">
-                <button className="voice-btn" onClick={() => new Audio(`http://localhost:3000${msg.audioUrl}`).play()}>▶</button>
+                <button className="voice-btn" onClick={() => new Audio(`${serverUrl}${msg.audioUrl}`).play()}>▶</button>
                 <span>{msg.duration}</span>
               </div>
             ) : (
@@ -214,6 +225,7 @@ function PublicMessageList({ messages, currentUserId }) {
 
 function PublicMessageInput({ onSendMessage, onSendVoice, onTyping }) {
   const { t } = useLanguage();
+  const { serverUrl, token } = useAuth();
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
@@ -237,9 +249,9 @@ function PublicMessageInput({ onSendMessage, onSendVoice, onTyping }) {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         const formData = new FormData();
         formData.append('voice', blob, 'voice.webm');
-        const response = await fetch(`${API_URL}/upload/voice`, {
+        const response = await fetch(`${serverUrl}/api/upload/voice`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          headers: { 'Authorization': `Bearer ${token}` },
           body: formData
         });
         const data = await response.json();
@@ -280,8 +292,8 @@ function CreateGroupModalWrapper({ users, currentUser, onClose, onCreate }) {
 }
 
 function AppContent() {
-  const { user, token, loading } = useAuth();
-  const { t } = useLanguage();
+  const { user, token, loading, serverUrl, logout } = useAuth();
+  const { t, language, setLanguage, languages, languageNames } = useLanguage();
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -295,12 +307,35 @@ function AppContent() {
   const [unreadGroup, setUnreadGroup] = useState({});
   const [privateTyping, setPrivateTyping] = useState(null);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showUserSearch, setShowUserSearch] = useState(false);
+  const [showJoinGroup, setShowJoinGroup] = useState(false);
+  const [isWindowFocused, setIsWindowFocused] = useState(true);
+  const [mobileTab, setMobileTab] = useState('public');
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const serverUrlRef = useRef(serverUrl);
+
+  useEffect(() => {
+    serverUrlRef.current = serverUrl;
+  }, [serverUrl]);
+
+  useEffect(() => {
+    const handleFocus = () => setIsWindowFocused(true);
+    const handleBlur = () => setIsWindowFocused(false);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   useEffect(() => {
     if (user && token) {
-      const socket = io('http://localhost:3000', { transports: ['websocket', 'polling'] });
+      const socket = io(serverUrlRef.current, { 
+        transports: ['websocket', 'polling'],
+        withCredentials: true
+      });
       socketRef.current = socket;
 
       socket.on('connect', () => {
@@ -330,6 +365,9 @@ function AppContent() {
 
       socket.on('receive-message', (message) => {
         setMessages(prev => [...prev, message]);
+        if (!isWindowFocused && message.senderId !== currentUser?.id) {
+          showNotification('TianshangChat', `${message.senderName}: ${message.content || '[语音消息]'}`);
+        }
       });
 
       socket.on('receive-private-message', ({ message, fromUser }) => {
@@ -346,6 +384,10 @@ function AppContent() {
             ...prev,
             [chatPartnerId]: (prev[chatPartnerId] || 0) + 1
           }));
+          
+          if (!isWindowFocused && !isSentByMe) {
+            showNotification('私聊消息', `${fromUser.username}: ${message.content || '[语音消息]'}`);
+          }
         }
       });
 
@@ -367,6 +409,10 @@ function AppContent() {
             ...prev,
             [group.id]: (prev[group.id] || 0) + 1
           }));
+          
+          if (!isWindowFocused && message.senderId !== currentUser?.id) {
+            showNotification(`群聊: ${group.name}`, `${message.senderName}: ${message.content || '[语音消息]'}`);
+          }
         }
       });
 
@@ -382,7 +428,7 @@ function AppContent() {
       });
 
       socket.on('member-left', ({ groupId }) => {
-        fetch(`${API_URL}/groups/${groupId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${serverUrl}/api/groups/${groupId}`, { headers: { 'Authorization': `Bearer ${token}` } })
           .then(r => r.json())
           .then(data => {
             if (data.success) {
@@ -398,7 +444,7 @@ function AppContent() {
 
   const loadHistory = async () => {
     try {
-      const res = await fetch(`${API_URL}/messages/history`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch(`${serverUrl}/api/messages/history`, { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
       if (data.success) setMessages(data.messages);
     } catch (error) {
@@ -412,7 +458,7 @@ function AppContent() {
     newUnread[targetUser.id] = 0;
     setUnreadPrivate(newUnread);
     try {
-      const res = await fetch(API_URL + '/messages/private/' + targetUser.id, { headers: { 'Authorization': 'Bearer ' + token } });
+      const res = await fetch(`${serverUrl}/api/messages/private/${targetUser.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
       if (data.success) {
         const newMessages = { ...privateMessages };
@@ -430,7 +476,7 @@ function AppContent() {
     newUnread[group.id] = 0;
     setUnreadGroup(newUnread);
     try {
-      const res = await fetch(API_URL + '/groups/' + group.id + '/messages', { headers: { 'Authorization': 'Bearer ' + token } });
+      const res = await fetch(`${serverUrl}/api/groups/${group.id}/messages`, { headers: { 'Authorization': `Bearer ${token}` } });
       const data = await res.json();
       if (data.success) {
         const newMessages = { ...groupMessages };
@@ -462,7 +508,7 @@ function AppContent() {
   };
 
   const addGroupMember = async (groupId, userId) => {
-    await fetch(`${API_URL}/groups/${groupId}/members`, {
+    await fetch(`${serverUrl}/api/groups/${groupId}/members`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId })
@@ -470,14 +516,14 @@ function AppContent() {
   };
 
   const removeGroupMember = async (groupId, userId) => {
-    await fetch(`${API_URL}/groups/${groupId}/members/${userId}`, {
+    await fetch(`${serverUrl}/api/groups/${groupId}/members/${userId}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });
   };
 
   const setAdmin = async (groupId, userId, isAdmin) => {
-    await fetch(`${API_URL}/groups/${groupId}/admin/${userId}`, {
+    await fetch(`${serverUrl}/api/groups/${groupId}/admin/${userId}`, {
       method: 'PUT',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ isAdmin })
@@ -485,7 +531,7 @@ function AppContent() {
   };
 
   const transferOwner = async (groupId, newOwnerId) => {
-    await fetch(`${API_URL}/groups/${groupId}/transfer`, {
+    await fetch(`${serverUrl}/api/groups/${groupId}/transfer`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ newOwnerId })
@@ -493,14 +539,14 @@ function AppContent() {
   };
 
   const leaveGroup = async (groupId) => {
-    await fetch(`${API_URL}/groups/${groupId}/leave`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+    await fetch(`${serverUrl}/api/groups/${groupId}/leave`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
     socketRef.current?.emit('leave-group', { groupId });
     if (selectedGroup?.id === groupId) setSelectedGroup(null);
   };
 
   const deleteGroup = async (groupId) => {
     if (confirm('Delete this group?')) {
-      await fetch(`${API_URL}/groups/${groupId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+      await fetch(`${serverUrl}/api/groups/${groupId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       if (selectedGroup?.id === groupId) setSelectedGroup(null);
       setGroupSettingsGroup(null);
     }
@@ -510,49 +556,229 @@ function AppContent() {
   if (!user) return <div className="welcome-screen"><h1>{t('welcomeTitle')}</h1><p>{t('welcomeSubtitle')}</p><AuthScreen /></div>;
   if (!currentUser) return <div className="welcome-screen"><h1>{t('welcomeTitle')}</h1><p>{t('connecting')}...</p></div>;
 
+  const renderMobileContent = () => {
+    if (privateChatUser) {
+      return (
+        <PrivateChatPanel
+          user={privateChatUser}
+          currentUserId={currentUser?.id}
+          messages={privateMessages[privateChatUser.id] || []}
+          onSendMessage={(content) => sendPrivateMessage(privateChatUser.id, content)}
+          onSendVoice={(url, duration) => sendPrivateVoice(privateChatUser.id, url, duration)}
+          onTyping={() => handlePrivateTyping(privateChatUser.id)}
+          onClose={() => setPrivateChatUser(null)}
+          typingUser={privateTyping}
+        />
+      );
+    }
+
+    if (selectedGroup) {
+      return (
+        <GroupChat
+          group={selectedGroup}
+          messages={groupMessages[selectedGroup.id] || []}
+          currentUser={currentUser}
+          onSendMessage={(content) => sendGroupMessage(selectedGroup.id, content)}
+          onSendVoice={(url, duration) => sendGroupVoice(selectedGroup.id, url, duration)}
+          onTyping={() => {}}
+          onOpenSettings={() => setGroupSettingsGroup(selectedGroup)}
+        />
+      );
+    }
+
+    switch (mobileTab) {
+      case 'public':
+        return (
+          <div className="public-chat">
+            <div className="public-chat-header">
+              <h1>{t('publicChat')}</h1>
+              <div className="header-right">
+                <span className="online-count">{users.length} {t('onlineUsers').toLowerCase()}</span>
+              </div>
+            </div>
+            <PublicMessageList messages={messages} currentUserId={currentUser?.id} />
+            <PublicMessageInput onSendMessage={sendPublicMessage} onSendVoice={sendPublicVoice} onTyping={handleTyping} />
+          </div>
+        );
+      case 'private':
+        return (
+          <div style={{ position: 'relative', height: '100%' }}>
+            <RecentChats
+              onSelectChat={(user) => openPrivateChat(user)}
+              unreadCounts={unreadPrivate}
+            />
+            <button
+              className="fab-button"
+              onClick={() => setShowUserSearch(true)}
+              style={{
+                position: 'absolute',
+                bottom: '80px',
+                right: '20px',
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'var(--primary-color)',
+                color: 'white',
+                border: 'none',
+                fontSize: '1.5rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              +
+            </button>
+          </div>
+        );
+      case 'groups':
+        return (
+          <div className="mobile-group-list">
+            <div className="mobile-group-header">
+              <h2>{t('myGroups')}</h2>
+              <div className="group-actions">
+                <button className="group-action-btn" onClick={() => setShowJoinGroup(true)}>+</button>
+              </div>
+            </div>
+            <div className="mobile-group-list-content">
+              {groups.length === 0 ? (
+                <div className="mobile-empty-groups">
+                  <span>{t('noGroups')}</span>
+                  <button onClick={() => setShowCreateGroup(true)}>{t('createGroup')}</button>
+                </div>
+              ) : (
+                groups.map((group) => (
+                  <div
+                    key={group.id}
+                    className="mobile-group-item"
+                    onClick={() => selectGroup(group)}
+                  >
+                    <span className="mobile-group-icon">👥</span>
+                    <div className="mobile-group-info">
+                      <div className="mobile-group-name">{group.name}</div>
+                      <div className="mobile-group-members">{group.member_count || 0} {t('members')}</div>
+                    </div>
+                    {unreadGroup?.[group.id] > 0 && (
+                      <span className="unread-badge">{unreadGroup[group.id]}</span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      case 'settings':
+        return (
+          <div className="settings-panel">
+            <h2>{t('settings')}</h2>
+            <div className="settings-section">
+              <label>{t('language')}</label>
+              <div className="language-options">
+                {languages.map((lang) => (
+                  <button
+                    key={lang}
+                    className={`lang-option ${language === lang ? 'active' : ''}`}
+                    onClick={() => setLanguage(lang)}
+                  >
+                    {languageNames[lang]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button className="logout-btn-mobile" onClick={logout}>
+              {t('logout')}
+            </button>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
-      <ChatLayout
-        currentUser={currentUser}
-        users={users}
-        groups={groups}
-        messages={messages}
-        privateMessages={privateMessages}
-        groupMessages={groupMessages}
-        privateChatUser={privateChatUser}
-        selectedGroup={selectedGroup}
-        groupSettingsGroup={groupSettingsGroup}
-        unreadPrivate={unreadPrivate}
-        unreadGroup={unreadGroup}
-        privateTyping={privateTyping}
-        onOpenPrivateChat={openPrivateChat}
-        onClosePrivateChat={() => setPrivateChatUser(null)}
-        onSelectGroup={selectGroup}
-        onOpenGroupSettings={setGroupSettingsGroup}
-        onCloseGroupSettings={() => setGroupSettingsGroup(null)}
-        onSendMessage={sendPublicMessage}
-        onSendPrivateMessage={sendPrivateMessage}
-        onSendGroupMessage={sendGroupMessage}
-        onSendVoice={sendPublicVoice}
-        onSendPrivateVoice={sendPrivateVoice}
-        onSendGroupVoice={sendGroupVoice}
-        onTyping={handleTyping}
-        onPrivateTyping={handlePrivateTyping}
-        onCreateGroup={() => setShowCreateGroup(true)}
-        onJoinGroup={(group) => { socketRef.current?.emit('join-group', { groupId: group.id }); selectGroup(group); }}
-        onAddGroupMember={addGroupMember}
-        onRemoveGroupMember={removeGroupMember}
-        onSetAdmin={setAdmin}
-        onTransferOwner={transferOwner}
-        onLeaveGroup={leaveGroup}
-        onDeleteGroup={deleteGroup}
-      />
-      {showCreateGroup && (
-        <CreateGroupModalWrapper
-          users={users}
+      {isAndroid ? (
+        <div className="app-container">
+          <div className="main-chat-area">
+            {renderMobileContent()}
+          </div>
+          <BottomNav activeTab={mobileTab} onTabChange={setMobileTab} />
+          {showUserSearch && (
+            <UserSearchModal
+              onClose={() => setShowUserSearch(false)}
+              onSelectUser={(user) => {
+                openPrivateChat(user);
+                setMobileTab('public');
+              }}
+            />
+          )}
+          {showJoinGroup && (
+            <JoinGroupModal
+              onClose={() => setShowJoinGroup(false)}
+              onJoinSuccess={(group) => {
+                selectGroup(group);
+                setMobileTab('public');
+              }}
+            />
+          )}
+          {showCreateGroup && (
+            <CreateGroupModal
+              users={users}
+              currentUser={currentUser}
+              onClose={() => setShowCreateGroup(false)}
+              onCreate={handleCreateGroup}
+            />
+          )}
+          {groupSettingsGroup && (
+            <GroupSettingsModal
+              group={groupSettingsGroup}
+              currentUser={currentUser}
+              onClose={() => setGroupSettingsGroup(null)}
+              onAddMember={(userId) => addGroupMember(groupSettingsGroup.id, userId)}
+              onRemoveMember={(userId) => removeGroupMember(groupSettingsGroup.id, userId)}
+              onSetAdmin={(userId, isAdmin) => setAdmin(groupSettingsGroup.id, userId, isAdmin)}
+              onTransferOwner={(userId) => transferOwner(groupSettingsGroup.id, userId)}
+              onLeaveGroup={() => leaveGroup(groupSettingsGroup.id)}
+              onDeleteGroup={() => deleteGroup(groupSettingsGroup.id)}
+            />
+          )}
+        </div>
+      ) : (
+        <ChatLayout
           currentUser={currentUser}
-          onClose={() => setShowCreateGroup(false)}
-          onCreate={handleCreateGroup}
+          users={users}
+          groups={groups}
+          messages={messages}
+          privateMessages={privateMessages}
+          groupMessages={groupMessages}
+          privateChatUser={privateChatUser}
+          selectedGroup={selectedGroup}
+          groupSettingsGroup={groupSettingsGroup}
+          unreadPrivate={unreadPrivate}
+          unreadGroup={unreadGroup}
+          privateTyping={privateTyping}
+          onOpenPrivateChat={openPrivateChat}
+          onClosePrivateChat={() => setPrivateChatUser(null)}
+          onSelectGroup={selectGroup}
+          onOpenGroupSettings={setGroupSettingsGroup}
+          onCloseGroupSettings={() => setGroupSettingsGroup(null)}
+          onSendMessage={sendPublicMessage}
+          onSendPrivateMessage={sendPrivateMessage}
+          onSendGroupMessage={sendGroupMessage}
+          onSendVoice={sendPublicVoice}
+          onSendPrivateVoice={sendPrivateVoice}
+          onSendGroupVoice={sendGroupVoice}
+          onTyping={handleTyping}
+          onPrivateTyping={handlePrivateTyping}
+          onCreateGroup={() => setShowCreateGroup(true)}
+          onJoinGroup={(group) => { socketRef.current?.emit('join-group', { groupId: group.id }); selectGroup(group); }}
+          onAddGroupMember={addGroupMember}
+          onRemoveGroupMember={removeGroupMember}
+          onSetAdmin={setAdmin}
+          onTransferOwner={transferOwner}
+          onLeaveGroup={leaveGroup}
+          onDeleteGroup={deleteGroup}
         />
       )}
     </>

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { SERVER_URL } from '../config';
 
 function MessageList({ messages, currentUserId }) {
   const listRef = useRef(null);
@@ -15,7 +16,7 @@ function MessageList({ messages, currentUserId }) {
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    audioRef.current = new Audio(`http://localhost:3000${message.audioUrl}`);
+    audioRef.current = new Audio(`${SERVER_URL}${message.audioUrl}`);
     audioRef.current.onended = () => setPlayingId(null);
     audioRef.current.onerror = () => setPlayingId(null);
     audioRef.current.play();
@@ -69,7 +70,7 @@ function MessageList({ messages, currentUserId }) {
           >
             {message.senderAvatar ? (
               <img
-                src={`http://localhost:3000${message.senderAvatar}`}
+                src={`${SERVER_URL}${message.senderAvatar}`}
                 alt={message.senderName}
                 className="message-avatar"
               />

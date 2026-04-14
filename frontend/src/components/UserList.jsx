@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { SERVER_URL } from '../config';
 
 function UserList({ users, currentUser, onUserClick, unreadCounts }) {
   const { t } = useLanguage();
@@ -22,7 +23,7 @@ function UserList({ users, currentUser, onUserClick, unreadCounts }) {
             <span className="online-indicator"></span>
             {user.avatar ? (
               <img
-                src={`http://localhost:3000${user.avatar}`}
+                src={`${SERVER_URL}${user.avatar}`}
                 alt={user.username}
                 className="message-avatar"
                 style={{ width: 32, height: 32 }}

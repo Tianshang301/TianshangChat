@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { SERVER_URL } from '../config';
 
 function GroupSettingsModal({ group, currentUser, onClose, onAddMember, onRemoveMember, onSetAdmin, onTransferOwner, onLeaveGroup, onDeleteGroup }) {
   const { t } = useLanguage();
@@ -46,7 +47,7 @@ function GroupSettingsModal({ group, currentUser, onClose, onAddMember, onRemove
                 <div key={member.user_id} className="member-item">
                   <div className="member-info">
                     {member.avatar ? (
-                      <img src={`http://localhost:3000${member.avatar}`} alt="" className="member-avatar" />
+                      <img src={`${SERVER_URL}${member.avatar}`} alt="" className="member-avatar" />
                     ) : (
                       <div className="member-avatar-placeholder">{member.username?.charAt(0).toUpperCase()}</div>
                     )}

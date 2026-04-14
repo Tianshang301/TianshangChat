@@ -1,18 +1,27 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getServerUrl } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
+const isAndroid = typeof window !== 'undefined' && window.Capacitor !== undefined;
+const PORT = 3000;
+
 function LoginForm({ onSwitchToRegister }) {
-  const { login, error, clearError } = useAuth();
+  const { login, error, clearError, serverIp, setServerIp, updateServerUrl } = useAuth();
   const { t, language, setLanguage, languages, languageNames } = useLanguage();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [localServerIp, setLocalServerIp] = useState(serverIp);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     clearError();
+    if (isAndroid && localServerIp) {
+      const newUrl = `http://${localServerIp}:${PORT}`;
+      updateServerUrl(newUrl);
+      setServerIp(localServerIp);
+    }
     setLoading(true);
     await login(username, password, remember);
     setLoading(false);
@@ -64,6 +73,18 @@ function LoginForm({ onSwitchToRegister }) {
           {t('register')}
         </button>
       </div>
+      {isAndroid && (
+        <div className="server-ip-section">
+          <label className="server-ip-label">{t('serverIp') || 'Server IP'}:</label>
+          <input
+            type="text"
+            className="auth-input server-ip-input"
+            placeholder={t('enterServerIp') || 'Enter server IP (e.g. 192.168.1.100)'}
+            value={localServerIp}
+            onChange={(e) => setLocalServerIp(e.target.value)}
+          />
+        </div>
+      )}
       <div className="language-selector-welcome">
         {languages.map((lang) => (
           <button
