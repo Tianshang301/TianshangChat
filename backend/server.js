@@ -9,8 +9,10 @@ const jwt = require('jsonwebtoken');
 const authRoutes = require('./routes/auth');
 const uploadRoutes = require('./routes/upload');
 const messageRoutes = require('./routes/messages');
+const groupRoutes = require('./routes/groups');
 const Message = require('./models/Message');
 const User = require('./models/User');
+const Group = require('./models/Group');
 const db = require('./database/db');
 
 dotenv.config();
@@ -35,8 +37,21 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/groups', groupRoutes);
 
 const onlineUsers = new Map();
+const userSockets = new Map();
+
+function getSocketByUserId(userId) {
+  return userSockets.get(userId);
+}
+
+function broadcastGroupUpdate(groupId) {
+  const group = Group.findById(groupId);
+  if (group) {
+    io.to(`group-${groupId}`).emit('group-updated', { group });
+  }
+}
 
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
@@ -74,9 +89,17 @@ io.on('connection', (socket) => {
       };
 
       onlineUsers.set(socket.id, user);
+      userSockets.set(user.id, socket);
 
       socket.emit('authenticated', { user });
+      socket.emit('user-list-update', Array.from(onlineUsers.values()));
       socket.broadcast.emit('user-list-update', Array.from(onlineUsers.values()));
+      
+      const userGroups = Group.getUserGroups(user.id);
+      userGroups.forEach(g => {
+        socket.join(`group-${g.id}`);
+      });
+      socket.emit('group-list-update', { groups: userGroups });
       
       console.log('User authenticated:', user.username);
     } catch (error) {
@@ -85,6 +108,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Public message
   socket.on('send-message', (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) {
@@ -113,6 +137,7 @@ io.on('connection', (socket) => {
     io.emit('receive-message', broadcastMessage);
   });
 
+  // Public voice message
   socket.on('send-voice', (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) {
@@ -143,6 +168,279 @@ io.on('connection', (socket) => {
     io.emit('receive-message', broadcastMessage);
   });
 
+  // Private message
+  socket.on('send-private-message', (data) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user) {
+      socket.emit('error', { error: 'Not authenticated' });
+      return;
+    }
+
+    const { recipientId, content } = data;
+    
+    const message = Message.create({
+      senderId: user.id,
+      senderName: user.username,
+      senderAvatar: user.avatar,
+      recipientId: recipientId,
+      content: content,
+      type: 'text'
+    });
+
+    const broadcastMessage = {
+      id: message.id,
+      senderId: user.id,
+      senderName: user.username,
+      senderAvatar: user.avatar,
+      recipientId: recipientId,
+      content: content,
+      type: 'text',
+      timestamp: new Date()
+    };
+
+    socket.emit('receive-private-message', { message: broadcastMessage, fromUser: user });
+    
+    const recipientSocket = getSocketByUserId(recipientId);
+    if (recipientSocket) {
+      recipientSocket.emit('receive-private-message', { message: broadcastMessage, fromUser: user });
+    }
+  });
+
+  // Private voice message
+  socket.on('send-private-voice', (data) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user) {
+      socket.emit('error', { error: 'Not authenticated' });
+      return;
+    }
+
+    const { recipientId, audioUrl, duration } = data;
+    
+    const message = Message.create({
+      senderId: user.id,
+      senderName: user.username,
+      senderAvatar: user.avatar,
+      recipientId: recipientId,
+      audioUrl: audioUrl,
+      duration: duration,
+      type: 'voice'
+    });
+
+    const broadcastMessage = {
+      id: message.id,
+      senderId: user.id,
+      senderName: user.username,
+      senderAvatar: user.avatar,
+      recipientId: recipientId,
+      audioUrl: audioUrl,
+      duration: duration,
+      type: 'voice',
+      timestamp: new Date()
+    };
+
+    socket.emit('receive-private-message', { message: broadcastMessage, fromUser: user });
+    
+    const recipientSocket = getSocketByUserId(recipientId);
+    if (recipientSocket) {
+      recipientSocket.emit('receive-private-message', { message: broadcastMessage, fromUser: user });
+    }
+  });
+
+  // Private typing
+  socket.on('private-typing', (data) => {
+    const user = onlineUsers.get(socket.id);
+    if (user) {
+      const recipientSocket = getSocketByUserId(data.recipientId);
+      if (recipientSocket) {
+        recipientSocket.emit('private-typing-start', { 
+          fromUserId: user.id, 
+          username: user.username,
+          senderName: user.username,
+          senderAvatar: user.avatar 
+        });
+      }
+    }
+  });
+
+  socket.on('stop-private-typing', (data) => {
+    const user = onlineUsers.get(socket.id);
+    if (user) {
+      const recipientSocket = getSocketByUserId(data.recipientId);
+      if (recipientSocket) {
+        recipientSocket.emit('private-typing-stop', { fromUserId: user.id });
+      }
+    }
+  });
+
+  // Group message
+  socket.on('send-group-message', (data) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user) {
+      socket.emit('error', { error: 'Not authenticated' });
+      return;
+    }
+
+    const { groupId, content } = data;
+
+    if (!Group.isMember(groupId, user.id)) {
+      socket.emit('error', { error: 'Not a member of this group' });
+      return;
+    }
+
+    const message = Message.create({
+      senderId: user.id,
+      senderName: user.username,
+      senderAvatar: user.avatar,
+      groupId: groupId,
+      content: content,
+      type: 'text'
+    });
+
+    const broadcastMessage = {
+      id: message.id,
+      senderId: user.id,
+      senderName: user.username,
+      senderAvatar: user.avatar,
+      groupId: groupId,
+      content: content,
+      type: 'text',
+      timestamp: new Date()
+    };
+
+    io.to(`group-${groupId}`).emit('receive-group-message', { 
+      message: broadcastMessage,
+      group: Group.findById(groupId)
+    });
+  });
+
+  // Group voice message
+  socket.on('send-group-voice', (data) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user) {
+      socket.emit('error', { error: 'Not authenticated' });
+      return;
+    }
+
+    const { groupId, audioUrl, duration } = data;
+
+    if (!Group.isMember(groupId, user.id)) {
+      socket.emit('error', { error: 'Not a member of this group' });
+      return;
+    }
+
+    const message = Message.create({
+      senderId: user.id,
+      senderName: user.username,
+      senderAvatar: user.avatar,
+      groupId: groupId,
+      audioUrl: audioUrl,
+      duration: duration,
+      type: 'voice'
+    });
+
+    const broadcastMessage = {
+      id: message.id,
+      senderId: user.id,
+      senderName: user.username,
+      senderAvatar: user.avatar,
+      groupId: groupId,
+      audioUrl: audioUrl,
+      duration: duration,
+      type: 'voice',
+      timestamp: new Date()
+    };
+
+    io.to(`group-${groupId}`).emit('receive-group-message', { 
+      message: broadcastMessage,
+      group: Group.findById(groupId)
+    });
+  });
+
+  // Create group
+  socket.on('create-group', (data) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user) {
+      socket.emit('error', { error: 'Not authenticated' });
+      return;
+    }
+
+    const { name, memberIds } = data;
+    const group = Group.create(name, user.id, memberIds || []);
+    
+    socket.join(`group-${group.id}`);
+    
+    const userGroups = Group.getUserGroups(user.id);
+    socket.emit('group-list-update', { groups: userGroups });
+    socket.emit('group-created', { group });
+  });
+
+  // Join group
+  socket.on('join-group', (data) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user) {
+      socket.emit('error', { error: 'Not authenticated' });
+      return;
+    }
+
+    const { groupId } = data;
+    const group = Group.findById(groupId);
+    
+    if (!group) {
+      socket.emit('error', { error: 'Group not found' });
+      return;
+    }
+
+    if (Group.isMember(groupId, user.id)) {
+      socket.join(`group-${groupId}`);
+      const userGroups = Group.getUserGroups(user.id);
+      socket.emit('group-list-update', { groups: userGroups });
+      return;
+    }
+
+    const role = Group.getMemberRole(groupId, user.id);
+    if (role === 'creator' || role === 'admin') {
+      Group.addMember(groupId, user.id);
+      socket.join(`group-${groupId}`);
+      
+      const newMember = { id: user.id, username: user.username, avatar: user.avatar };
+      io.to(`group-${groupId}`).emit('member-joined', { groupId, user: newMember, group });
+      
+      const userGroups = Group.getUserGroups(user.id);
+      socket.emit('group-list-update', { groups: userGroups });
+    }
+  });
+
+  // Leave group
+  socket.on('leave-group', (data) => {
+    const user = onlineUsers.get(socket.id);
+    if (!user) {
+      socket.emit('error', { error: 'Not authenticated' });
+      return;
+    }
+
+    const { groupId } = data;
+    const group = Group.findById(groupId);
+    
+    if (!group) {
+      socket.emit('error', { error: 'Group not found' });
+      return;
+    }
+
+    if (group.creator_id === user.id) {
+      socket.emit('error', { error: 'Creator cannot leave. Transfer ownership or delete the group.' });
+      return;
+    }
+
+    socket.leave(`group-${groupId}`);
+    Group.removeMember(groupId, user.id);
+    
+    io.to(`group-${groupId}`).emit('member-left', { groupId, userId: user.id, username: user.username });
+    
+    const userGroups = Group.getUserGroups(user.id);
+    socket.emit('group-list-update', { groups: userGroups });
+  });
+
+  // Typing indicators
   socket.on('typing', () => {
     const user = onlineUsers.get(socket.id);
     if (user) {
@@ -159,14 +457,16 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Avatar update
   socket.on('update-avatar', (avatarUrl) => {
     const user = onlineUsers.get(socket.id);
     if (user) {
       User.updateAvatar(user.id, avatarUrl);
       user.avatar = avatarUrl;
       onlineUsers.set(socket.id, user);
+      userSockets.set(user.id, socket);
+      
       io.emit('avatar-updated', {
-        userId: socket.id,
         userId: user.id,
         username: user.username,
         avatar: avatarUrl
@@ -178,8 +478,8 @@ io.on('connection', (socket) => {
     const user = onlineUsers.get(socket.id);
     onlineUsers.delete(socket.id);
     if (user) {
+      userSockets.delete(user.id);
       io.emit('user-left', {
-        userId: socket.id,
         userId: user.id,
         username: user.username
       });
