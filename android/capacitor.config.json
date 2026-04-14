@@ -1,0 +1,21 @@
+{
+  "appId": "com.tianshang.chat",
+  "appName": "Tianshang",
+  "webDir": "../frontend/dist",
+  "server": {
+    "androidScheme": "https",
+    "url": "http://localhost:5173"
+  },
+  "plugins": {
+    "CapacitorHTTP": {
+      "enabled": true
+    },
+    "Camera": {
+      "enabled": true
+    },
+    "Filesystem": {
+      "enabled": true
+    }
+  },
+  "cordova": {}
+}

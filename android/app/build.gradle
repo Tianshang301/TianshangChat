@@ -1,0 +1,11 @@
+{
+  "project_info": {
+    "project_name": "Tianshang",
+    "package_name": "com.tianshang.chat"
+  },
+  "compileSdk": 34,
+  "minSdk": 22,
+  "targetSdk": 34,
+  "versionCode": 1,
+  "versionName": "1.0.0"
+}

@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+build/
+*.exe
+*.apk
+*.ipa
+*.dmg
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Electron
+electron/dist/
+electron/node_modules/
+
+# Android
+android/app/build/
+android/.gradle/
+android/build/
+android/.idea/
+android/local.properties
+
+# Capacitor
+android/capacitor/.gradle/
+android/capacitor/build/
