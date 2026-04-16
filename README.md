@@ -1,5 +1,11 @@
 # TianshangChat
 
+- en [English](README.md)
+- zh_CN [简体中文](readme/README.zh_CN.md)
+- zh_TW [繁體中文](readme/README.zh_TW.md)
+- ja [日本語](readme/README.ja.md)
+- ko [한국어](readme/README.ko.md)
+
 A real-time chat application with support for public chat, private messaging, and group conversations. Available on Web, Android, and Windows Desktop.
 
 ## Features
