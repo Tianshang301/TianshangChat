@@ -1,4 +1,4 @@
-# 天上Chat
+# TianshangChat
 
 一款支持公共聊天、私人消息和群组聊天的实时聊天应用。支持 Web、Android 和 Windows 桌面端。
 
@@ -18,7 +18,7 @@
 | **Web** | 浏览器端应用 |
 | **Android** | 底部导航移动应用 |
 | **Windows** | 带系统托盘的桌面客户端 |
-
+Tianshang
 ### 网络功能
 - **局域网支持**：连接本地网络服务器
 - **手动IP配置**：适用于 Android 和远程连接
