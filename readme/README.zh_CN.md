@@ -1,4 +1,4 @@
-# 天上Chat
+# TianshangChat
 
 一款支持公共聊天、私人消息和群组聊天的实时聊天应用。支持 Web、Android 和 Windows 桌面端。
 
