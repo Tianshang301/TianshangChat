@@ -20,7 +20,7 @@
 
 ---
 
-## 2. 重构起点 · 现状基线（2025 勘察结论）
+## 2. 重构起点 · 现状基线（2026-08 勘察结论）
 
 | 维度 | 已核实现状 | 问题定性 |
 |------|-----------|----------|
@@ -232,13 +232,16 @@ docker compose up -d         # 一键部署 server + Caddy TLS + coturn
 3. Require linear history（配合 squash merge）。
 4. Do not allow force pushes / deletions。
 
-### 11.5 开工前一次性收尾清单（执行顺序即优先级）
+### 11.5 开工前一次性收尾清单（✅ 已全部完成 · 2026-08-24）
 
-- [ ] **认证修复**：到 GitHub → Developer settings **revoke 已失效的内嵌 PAT**；`git remote set-url origin https://github.com/Tianshang301/TianshangChat.git`；凭据交由 Windows Git Credential Manager 托管。
-- [ ] **数据库移出跟踪**：`.gitignore` 追加 `backend/database/chat.db*`，执行 `git rm --cached backend/database/chat.db-shm backend/database/chat.db-wal`。
-- [ ] **换行统一**：新建 `.gitattributes` 内容 `* text=auto`，消除 CRLF 变更噪音。
-- [ ] **收尾快照**：将全部遗留改动（约 +303/−127，19 文件，含未跟踪的 `VoicePlayer.jsx` 与本文件）提交入库，打 `git tag -a v1.0-legacy` 并推送 `main --tags`。
-- [ ] **Release 归档**：在 GitHub 以 `v1.0-legacy` 创建 Release「Legacy Demo」，附旧版 APK 与简述。
+- [x] **认证修复**：remote URL 已剥离内嵌 token（API 实测该令牌 HTTP 401 已失效，当前树与全部历史无泄漏）；凭据由 GitHub CLI 接管。
+- [x] **数据库移出跟踪**：`backend/database/chat.db*` 入 `.gitignore`，两个 WAL 边车已移出索引。
+- [x] **换行统一**：`.gitattributes` 已写入 `* text=auto`。
+- [x] **收尾快照 + 基线锚点**：提交 `422ff98`（23 文件），tag `v1.0-legacy` 已推送；与上游唯一差异（LICENSE）无冲突合并后同步。
+- [x] **Release 归档**：[Legacy Demo v1.0](https://github.com/Tianshang301/TianshangChat/releases/tag/v1.0-legacy) 已发布并附旧版 APK。
+- [x] **分支保护（§11.4）**：PR 闸门（0 审批即可合）+ enforce_admins + linear history + 禁 force push/删除，已通过 API 生效；Required status checks 留待 Phase 4 流水线上线后追加。
+
+> ⚠️ **保护生效后的工作流变化**：任何改动不得直接 `git push origin main`——一律短分支 → `gh pr create` → `gh pr merge --squash --delete-branch`。
 
 ### 11.6 遗留代码三档处置（勘察实证，迁移时的行为准绳）
 
