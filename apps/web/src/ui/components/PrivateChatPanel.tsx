@@ -1,25 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLanguage } from '../context/LanguageContext';
-import { SERVER_URL } from '../config';
+import { useLanguage } from '../../context/LanguageContext';
+import { SERVER_URL } from '../../config';
 import VoicePlayer from './VoicePlayer';
-import type { GroupDetail, MessageDTO, UserSummary } from '@tianshangchat/shared';
+import type { MessageDTO } from '@tianshangchat/shared';
 
-function GroupChat({
-  group,
+interface ChatPartner {
+  id: number;
+  username: string;
+  avatar: string | null;
+}
+
+function PrivateChatPanel({
+  user,
   messages,
-  currentUser,
+  currentUserId,
   onSendMessage,
   onSendVoice,
   onTyping,
-  onOpenSettings,
+  onClose,
+  typingUser,
 }: {
-  group: GroupDetail;
+  user: ChatPartner;
   messages: MessageDTO[];
-  currentUser?: UserSummary | null;
+  currentUserId?: number | null;
   onSendMessage: (content: string) => void;
   onSendVoice: (url: string, duration: string) => void;
   onTyping: () => void;
-  onOpenSettings: () => void;
+  onClose: () => void;
+  typingUser?: string | null;
 }) {
   const { t } = useLanguage();
   const [message, setMessage] = useState('');
@@ -113,47 +121,44 @@ function GroupChat({
   };
 
   return (
-    <div className="group-chat">
-      <div className="group-chat-header">
-        <div className="group-info-header">
-          <span className="group-icon">👥</span>
-          <div className="group-details">
-            <span className="group-name">{group.name}</span>
-            <span className="member-count">
-              {(group.members ?? []).length} {t('members')}
-            </span>
-          </div>
+    <div className="private-chat-panel">
+      <div className="panel-header">
+        <div className="user-info-header">
+          {user.avatar ? (
+            <img src={`${SERVER_URL}${user.avatar}`} alt="" className="panel-avatar" />
+          ) : (
+            <div className="panel-avatar-placeholder">{user.username?.charAt(0).toUpperCase()}</div>
+          )}
+          <span className="panel-username">{user.username}</span>
         </div>
-        <button className="settings-btn" onClick={onOpenSettings}>⚙️</button>
+        <button className="close-panel-btn" onClick={onClose}>×</button>
       </div>
 
-      <div className="group-messages" ref={listRef}>
+      <div className="private-messages" ref={listRef}>
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`message ${msg.senderId === currentUser?.id ? 'own' : ''}`}
+            className={`private-message ${msg.senderId === currentUserId ? 'sent' : 'received'}`}
           >
-            {msg.senderId !== currentUser?.id && (
-              msg.senderAvatar ? (
-                <img src={`${SERVER_URL}${msg.senderAvatar}`} alt="" className="message-avatar" />
-              ) : (
-                <div className="message-avatar">{msg.senderName?.charAt(0).toUpperCase()}</div>
-              )
-            )}
-            <div className="message-content">
-              {msg.senderId !== currentUser?.id && <div className="message-sender">{msg.senderName}</div>}
+            <div className="message-bubble">
               {msg.type === 'voice' ? (
                 <VoicePlayer audioUrl={`${SERVER_URL}${msg.audioUrl ?? ''}`} duration={msg.duration} />
               ) : (
                 <div className="message-text">{msg.content}</div>
               )}
-              <div className="message-time">{formatTime(msg.timestamp)}</div>
+              <span className="message-time">{formatTime(msg.timestamp)}</span>
             </div>
           </div>
         ))}
       </div>
 
-      <form className="message-input-form" onSubmit={handleSubmit}>
+      {typingUser && (
+        <div className="typing-indicator">
+          {typingUser} {t('typing')}
+        </div>
+      )}
+
+      <form className="private-input-form" onSubmit={handleSubmit}>
         <button
           type="button"
           className={`icon-btn ${isRecording ? 'recording' : ''}`}
@@ -177,4 +182,4 @@ function GroupChat({
   );
 }
 
-export default GroupChat;
+export default PrivateChatPanel;

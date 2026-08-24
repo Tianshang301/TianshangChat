@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useLanguage } from '../context/LanguageContext';
-import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 
 const isAndroid = typeof window !== 'undefined' && window.Capacitor !== undefined;
 const PORT = 3000;

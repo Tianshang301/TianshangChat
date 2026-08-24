@@ -19,7 +19,7 @@ const SyncQuerySchema = z.object({
  * Returns every message visible to the caller with `id > cursor`, ascending.
  * Cursor = highest message id the client has persisted.
  */
-router.get('/sync', authMiddleware, (req, res) => {
+router.get('/', authMiddleware, (req, res) => {
   const { cursor, limit } = parseQuery(SyncQuerySchema, req.query);
   const me = req.user!.id;
 

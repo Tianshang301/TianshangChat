@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { SERVER_URL } from '../config';
+import { SERVER_URL } from '../../config';
 import type { MessageDTO } from '@tianshangchat/shared';
 
 interface GroupedItem {

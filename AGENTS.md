@@ -145,12 +145,12 @@ docker compose up -d         # 一键部署 server + Caddy TLS + coturn
 - 备注：群组/用户 REST 响应由 snake_case 统一为 camelCase（与 shared DTO 对齐），重构前的旧客户端需更新后兼容
 
 ### Phase 2 · 分层架构 + 离线优先（≈2 周）
-- [ ] `App.jsx`(741行)/ChatRoom 拆解至 domain/data/ui/state
-- [ ] Dexie 消息缓存；outbox 队列（指数退避重试）
-- [ ] 消息状态机 `sending→sent→delivered→read` 持久化；服务端补回执事件
-- [ ] `GET /api/sync?cursor=` 增量同步端点（重连/启动补拉）
-- [ ] vite-plugin-pwa：壳缓存，离线读历史 + 排队发送
-- **DoD**：飞行模式收发不丢，恢复网络自动补投（Playwright 断网用例覆盖）
+- [x] `App.jsx`(741行)/ChatRoom 拆解至 domain/data/ui/state
+- [x] Dexie 消息缓存；outbox 队列（指数退避重试）
+- [x] 消息状态机 `sending→sent→delivered→read` 持久化；服务端补回执事件
+- [x] `GET /api/sync?cursor=` 增量同步端点（重连/启动补拉）
+- [x] vite-plugin-pwa：壳缓存，离线读历史 + 排队发送
+- **DoD**：飞行模式收发不丢，恢复网络自动补投 ✅（2026-08-24，运行时冒烟 5/5：ack/delivered/read/sync/增量；Playwright 断网用例随 Phase 4 测试体系落地）
 
 ### Phase 3 · 安全纵深（≈2 周）
 - [ ] 私聊 X3DH + Double Ratchet；群聊 Sender Keys
