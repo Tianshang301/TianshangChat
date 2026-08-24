@@ -1,7 +1,8 @@
-{
-  "name": "tianshangchat-backend",
-  "version": "1.0.0",
-  "description": "Backend for Tianshang real-time chat application",
+﻿{
+  "name": "@tianshangchat/server",
+  "version": "2.0.0-alpha.0",
+  "private": true,
+  "description": "TianshangChat backend: Express + Socket.IO + Drizzle (SQLite)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -1,5 +1,5 @@
 {
-  "name": "tianshangchat-desktop",
+  "name": "@tianshangchat/desktop",
   "version": "1.0.0",
   "description": "TianshangChat - Real-time chat application",
   "main": "main.js",
@@ -28,7 +28,7 @@
     ],
     "extraResources": [
       {
-        "from": "../frontend/dist",
+        "from": "../web/dist",
         "to": "dist",
         "filter": ["**/*"]
       }

@@ -1,6 +1,7 @@
 {
-  "name": "tianshangchat-frontend",
-  "version": "1.0.0",
+  "name": "@tianshangchat/web",
+  "version": "2.0.0-alpha.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
