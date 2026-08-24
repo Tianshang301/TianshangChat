@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
-import { useLanguage } from '../context/LanguageContext';
-import { useAuth } from '../context/AuthContext';
-import { API_URL } from '../config';
+import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { API_URL } from '../../config';
 
 function VoiceRecorder({ onSendVoice }: { onSendVoice: (url: string, duration: string) => void }) {
   const { t } = useLanguage();

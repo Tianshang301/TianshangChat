@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
-import { useLanguage } from '../context/LanguageContext';
-import { useAuth } from '../context/AuthContext';
-import { SERVER_URL, API_URL } from '../config';
+import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { SERVER_URL, API_URL } from '../../config';
 import type { UserSummary } from '@tianshangchat/shared';
 
 function UserAvatar({

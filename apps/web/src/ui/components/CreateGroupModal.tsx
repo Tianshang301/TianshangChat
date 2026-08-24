@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useLanguage } from '../context/LanguageContext';
-import { SERVER_URL } from '../config';
+import { useLanguage } from '../../context/LanguageContext';
+import { SERVER_URL } from '../../config';
 import type { OnlineUser } from '@tianshangchat/shared';
 
 function CreateGroupModal({

@@ -1,7 +1,7 @@
 import type { Server } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents } from '@tianshangchat/shared';
+import type { ClientToServerEvents, SendAck, ServerToClientEvents } from '@tianshangchat/shared';
 import { ErrorCode, groupRoom, protocolError, validateUploadPath } from '@tianshangchat/shared';
-import { createMessage } from '../../data/message.repo.js';
+import { createMessage, markDelivered } from '../../data/message.repo.js';
 import * as groupRepo from '../../data/group.repo.js';
 import { presence, type ChatSocket } from './presence.js';
 import { safeHandler } from './safe.js';
@@ -19,6 +19,21 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function ackSend(ack: ((res: SendAck) => void) | undefined, id: number): void {
+  try {
+    ack?.({ id });
+  } catch {
+    /* client gone before ack */
+  }
+}
+
+/** Online members other than the sender — used for delivered receipts. */
+function onlineRecipients(groupId: number, senderId: number): number[] {
+  return groupRepo
+    .getMemberUserIds(groupId)
+    .filter((id) => id !== senderId && presence.getSocketByUserId(id) !== undefined);
+}
+
 export function registerGroupHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
   socket: ChatSocket,
@@ -26,7 +41,7 @@ export function registerGroupHandlers(
   // ---------------- group messages ----------------
   socket.on(
     'send-group-message',
-    safeHandler((data) => {
+    safeHandler((data, ack) => {
       const user = requireUser(socket);
       if (!user) return;
 
@@ -59,12 +74,20 @@ export function registerGroupHandlers(
         },
         group: groupRepo.findGroupById(groupId)!,
       });
+
+      const online = onlineRecipients(groupId, user.id);
+      if (online.length > 0) {
+        markDelivered([message.id], null, groupId);
+        socket.emit('message-status', { statuses: [{ id: message.id, status: 'delivered' }] });
+      }
+
+      ackSend(ack, message.id);
     }),
   );
 
   socket.on(
     'send-group-voice',
-    safeHandler((data) => {
+    safeHandler((data, ack) => {
       const user = requireUser(socket);
       if (!user) return;
 
@@ -104,6 +127,14 @@ export function registerGroupHandlers(
         },
         group: groupRepo.findGroupById(groupId)!,
       });
+
+      const onlineVoice = onlineRecipients(groupId, user.id);
+      if (onlineVoice.length > 0) {
+        markDelivered([message.id], null, groupId);
+        socket.emit('message-status', { statuses: [{ id: message.id, status: 'delivered' }] });
+      }
+
+      ackSend(ack, message.id);
     }),
   );
 

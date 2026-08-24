@@ -1,41 +1,31 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { io, type Socket } from 'socket.io-client';
-import type {
-  ClientToServerEvents,
-  GroupDetail,
-  GroupSummary,
-  MessageDTO,
-  OnlineUser,
-  ServerToClientEvents,
-  UserSummary,
-} from '@tianshangchat/shared';
+import React, { useCallback, useEffect, useState } from 'react';
+import type { GroupSummary, MessageDTO } from '@tianshangchat/shared';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import UserList from './components/UserList';
-import GroupList from './components/GroupList';
-import PrivateChatPanel from './components/PrivateChatPanel';
-import GroupChat from './components/GroupChat';
-import CreateGroupModal from './components/CreateGroupModal';
-import GroupSettingsModal from './components/GroupSettingsModal';
-import LoginForm from './components/LoginForm';
-import RegisterForm from './components/RegisterForm';
-import BottomNav, { type MobileTab } from './components/BottomNav';
-import UserSearchModal from './components/UserSearchModal';
-import JoinGroupModal from './components/JoinGroupModal';
-import RecentChats from './components/RecentChats';
-import VoicePlayer from './components/VoicePlayer';
-import { showNotification } from './utils/notifications';
-
-type ChatSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
-type UnreadMap = Record<number, number>;
+import { useChatStore, type ChatPartner } from './state/chatStore';
+import { useUiStore } from './state/uiStore';
+import { useChatConnection } from './hooks/useChatConnection';
+import { sendText, sendVoice } from './domain/messaging';
+import {
+  openGroupConversation,
+  openPrivateConversation,
+} from './domain/conversations';
+import { makeGroupUseCases } from './domain/groups';
+import UserList from './ui/components/UserList';
+import GroupList from './ui/components/GroupList';
+import PrivateChatPanel from './ui/components/PrivateChatPanel';
+import GroupChat from './ui/components/GroupChat';
+import CreateGroupModal from './ui/components/CreateGroupModal';
+import GroupSettingsModal from './ui/components/GroupSettingsModal';
+import LoginForm from './ui/components/LoginForm';
+import RegisterForm from './ui/components/RegisterForm';
+import BottomNav from './ui/components/BottomNav';
+import UserSearchModal from './ui/components/UserSearchModal';
+import JoinGroupModal from './ui/components/JoinGroupModal';
+import RecentChats from './ui/components/RecentChats';
+import VoicePlayer from './ui/components/VoicePlayer';
 
 const isAndroid = typeof window !== 'undefined' && window.Capacitor !== undefined;
-
-interface ChatPartner {
-  id: number;
-  username: string;
-  avatar: string | null;
-}
 
 function AuthScreen() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -46,78 +36,53 @@ function AuthScreen() {
   return <RegisterForm onSwitchToLogin={() => setAuthMode('login')} />;
 }
 
-interface ChatLayoutProps {
-  currentUser: UserSummary;
-  users: OnlineUser[];
-  groups: GroupSummary[];
-  messages: MessageDTO[];
-  privateMessages: Record<number, MessageDTO[]>;
-  groupMessages: Record<number, MessageDTO[]>;
-  privateChatUser: ChatPartner | null;
-  selectedGroup: GroupDetail | null;
-  groupSettingsGroup: GroupDetail | null;
-  unreadPrivate: UnreadMap;
-  unreadGroup: UnreadMap;
-  privateTyping: string | null;
-  onOpenPrivateChat: (user: ChatPartner) => void;
-  onClosePrivateChat: () => void;
-  onSelectGroup: (group: GroupDetail) => void;
-  onOpenGroupSettings: (group: GroupDetail) => void;
-  onCloseGroupSettings: () => void;
-  onSendMessage: (content: string) => void;
-  onSendPrivateMessage: (recipientId: number, content: string) => void;
-  onSendGroupMessage: (groupId: number, content: string) => void;
-  onSendVoice: (url: string, duration: string) => void;
-  onSendPrivateVoice: (recipientId: number, url: string, duration: string) => void;
-  onSendGroupVoice: (groupId: number, url: string, duration: string) => void;
-  onTyping: () => void;
-  onPrivateTyping: (recipientId: number) => void;
-  onCreateGroup: () => void;
-  onJoinGroup: (group: GroupDetail) => void;  onAddGroupMember: (groupId: number, userId: number) => void;
-  onRemoveGroupMember: (groupId: number, userId: number) => void;
-  onSetAdmin: (groupId: number, userId: number, isAdmin: boolean) => void;
-  onTransferOwner: (groupId: number, userId: number) => void;
-  onLeaveGroup: (groupId: number) => void;
-  onDeleteGroup: (groupId: number) => void;
-}
-
-function ChatLayout(props: ChatLayoutProps) {
-  const {
-    currentUser,
-    users,
-    groups,
-    messages,
-    privateMessages,
-    groupMessages,
-    privateChatUser,
-    selectedGroup,
-    groupSettingsGroup,
-    unreadPrivate,
-    unreadGroup,
-    privateTyping,
-    onOpenPrivateChat,
-    onClosePrivateChat,
-    onSelectGroup,
-    onOpenGroupSettings,
-    onCloseGroupSettings,
-    onSendMessage,
-    onSendPrivateMessage,
-    onSendGroupMessage,
-    onSendVoice,
-    onSendPrivateVoice,
-    onSendGroupVoice,
-    onTyping,
-    onPrivateTyping,
-    onCreateGroup,
-    onAddGroupMember,
-    onRemoveGroupMember,
-    onSetAdmin,
-    onTransferOwner,
-    onLeaveGroup,
-    onDeleteGroup,
-  } = props;
+/** Desktop three-column layout — reads everything from the chat store. */
+function ChatLayout() {
   const { t, language, setLanguage, languages, languageNames } = useLanguage();
   const { logout, connectionType } = useAuth();
+  const token = useAuth().token ?? '';
+
+  const currentUser = useChatStore((s) => s.currentUser);
+  const users = useChatStore((s) => s.users);
+  const groups = useChatStore((s) => s.groups);
+  const messagesByConv = useChatStore((s) => s.messagesByConv);
+  const unreadPrivate = useChatStore((s) => s.unreadPrivate);
+  const unreadGroup = useChatStore((s) => s.unreadGroup);
+  const privateChatUser = useChatStore((s) => s.privateChatUser);
+  const selectedGroup = useChatStore((s) => s.selectedGroup);
+  const groupSettingsGroup = useChatStore((s) => s.groupSettingsGroup);
+  const privateTyping = useChatStore((s) => s.privateTypingFrom);
+
+  const groupUseCases = makeGroupUseCases(token);
+
+  const openPrivate = useCallback(
+    (partner: ChatPartner) => {
+      const s = useChatStore.getState();
+      s.openPrivateChat(partner);
+      s.clearUnreadPrivate(partner.id);
+      if (token) void openPrivateConversation(token, partner.id);
+    },
+    [token],
+  );
+
+  const selectGroup = useCallback(
+    (summary: GroupSummary) => {
+      if (!token) return;
+      void (async () => {
+        // Fetch detail for member list rendering.
+        const { api } = await import('./data/apiClient');
+        const detail = await api.groupDetail(token, summary.id);
+        if (!detail) return;
+        const st = useChatStore.getState();
+        st.setSelectedGroup(detail);
+        st.clearUnreadGroup(summary.id);
+        await openGroupConversation(token, summary.id);
+      })();
+    },
+    [token],
+  );
+
+  if (!currentUser) return null;
 
   return (
     <div className="app-container">
@@ -144,15 +109,17 @@ function ChatLayout(props: ChatLayoutProps) {
         </div>
 
         <div className="sidebar-content">
-          <UserList users={users} currentUser={currentUser} onUserClick={onOpenPrivateChat} unreadCounts={unreadPrivate} />
+          <UserList
+            users={users}
+            currentUser={currentUser}
+            onUserClick={openPrivate}
+            unreadCounts={unreadPrivate}
+          />
           <GroupList
             groups={groups}
             currentUser={currentUser}
-            onGroupClick={(g) => {
-              // Desktop sidebar join/enter: reuse select flow via settings-less path.
-              onSelectGroup(g as unknown as GroupDetail);
-            }}
-            onCreateGroup={onCreateGroup}
+            onGroupClick={selectGroup}
+            onCreateGroup={() => useUiStore.getState().setShowCreateGroup(true)}
             selectedGroupId={selectedGroup?.id}
             unreadCounts={unreadGroup}
           />
@@ -169,12 +136,14 @@ function ChatLayout(props: ChatLayoutProps) {
         {selectedGroup ? (
           <GroupChat
             group={selectedGroup}
-            messages={groupMessages[selectedGroup.id] ?? []}
+            messages={messagesByConv[`g:${selectedGroup.id}`] ?? []}
             currentUser={currentUser}
-            onSendMessage={(content) => onSendGroupMessage(selectedGroup.id, content)}
-            onSendVoice={(url, duration) => onSendGroupVoice(selectedGroup.id, url, duration)}
+            onSendMessage={(content) => void sendText({ kind: 'group', groupId: selectedGroup.id }, content)}
+            onSendVoice={(url, duration) =>
+              void sendVoice({ kind: 'group', groupId: selectedGroup.id }, url, duration)
+            }
             onTyping={() => {}}
-            onOpenSettings={() => onOpenGroupSettings(selectedGroup)}
+            onOpenSettings={() => useChatStore.getState().setGroupSettingsGroup(selectedGroup)}
           />
         ) : (
           <div className="public-chat">
@@ -186,8 +155,8 @@ function ChatLayout(props: ChatLayoutProps) {
                 </span>
               </div>
             </div>
-            <PublicMessageList messages={messages} currentUserId={currentUser?.id} />
-            <PublicMessageInput onSendMessage={onSendMessage} onSendVoice={onSendVoice} onTyping={onTyping} />
+            <PublicMessageList messages={messagesByConv['public'] ?? []} currentUserId={currentUser?.id} />
+            <PublicMessageInput />
           </div>
         )}
       </div>
@@ -196,11 +165,15 @@ function ChatLayout(props: ChatLayoutProps) {
         <PrivateChatPanel
           user={privateChatUser}
           currentUserId={currentUser?.id}
-          messages={privateMessages[privateChatUser.id] ?? []}
-          onSendMessage={(content) => onSendPrivateMessage(privateChatUser.id, content)}
-          onSendVoice={(url, duration) => onSendPrivateVoice(privateChatUser.id, url, duration)}
-          onTyping={() => onPrivateTyping(privateChatUser.id)}
-          onClose={onClosePrivateChat}
+          messages={messagesByConv[`p:${privateChatUser.id}`] ?? []}
+          onSendMessage={(content) =>
+            void sendText({ kind: 'private', peerId: privateChatUser.id }, content)
+          }
+          onSendVoice={(url, duration) =>
+            void sendVoice({ kind: 'private', peerId: privateChatUser.id }, url, duration)
+          }
+          onTyping={() => {}}
+          onClose={() => useChatStore.getState().closePrivateChat()}
           typingUser={privateTyping}
         />
       )}
@@ -209,22 +182,24 @@ function ChatLayout(props: ChatLayoutProps) {
         <GroupSettingsModal
           group={groupSettingsGroup}
           currentUser={currentUser}
-          onClose={onCloseGroupSettings}
-          onAddMember={(userId) => onAddGroupMember(groupSettingsGroup.id, userId)}
-          onRemoveMember={(userId) => onRemoveGroupMember(groupSettingsGroup.id, userId)}
-          onSetAdmin={(userId, isAdmin) => onSetAdmin(groupSettingsGroup.id, userId, isAdmin)}
-          onTransferOwner={(userId) => onTransferOwner(groupSettingsGroup.id, userId)}
-          onLeaveGroup={() => onLeaveGroup(groupSettingsGroup.id)}
-          onDeleteGroup={() => onDeleteGroup(groupSettingsGroup.id)}
+          onClose={() => useChatStore.getState().setGroupSettingsGroup(null)}
+          onAddMember={(userId) => void groupUseCases.addMember(groupSettingsGroup.id, userId)}
+          onRemoveMember={(userId) => void groupUseCases.removeMember(groupSettingsGroup.id, userId)}
+          onSetAdmin={(userId, isAdmin) =>
+            void groupUseCases.setAdmin(groupSettingsGroup.id, userId, isAdmin)
+          }
+          onTransferOwner={(userId) => void groupUseCases.transferOwner(groupSettingsGroup.id, userId)}
+          onLeaveGroup={() => void groupUseCases.leave(groupSettingsGroup.id)}
+          onDeleteGroup={() => void groupUseCases.remove(groupSettingsGroup.id)}
         />
       )}
     </div>
   );
 }
 
-function SidebarAvatar({ currentUser }: { currentUser: UserSummary }) {
-  const { token, serverUrl } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+function SidebarAvatar({ currentUser }: { currentUser: { avatar: string | null; username: string } }) {
+  const { serverUrl, token } = useAuth();
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -234,11 +209,16 @@ function SidebarAvatar({ currentUser }: { currentUser: UserSummary }) {
     try {
       const response = await fetch(`${serverUrl}/api/upload/avatar`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
       const data: unknown = await response.json();
-      if (typeof data === 'object' && data !== null && 'success' in data && (data as { success: boolean }).success) {
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        'success' in data &&
+        (data as { success: boolean }).success
+      ) {
         window.location.reload();
       }
     } catch (error) {
@@ -263,9 +243,9 @@ function SidebarAvatar({ currentUser }: { currentUser: UserSummary }) {
   );
 }
 
-function PublicMessageList({ messages, currentUserId }: { messages: MessageDTO[]; currentUserId?: number }) {
+function PublicMessageList({ messages, currentUserId }: { messages: MessageDTO[]; currentUserId?: number | null }) {
   const { serverUrl } = useAuth();
-  const listRef = useRef<HTMLDivElement | null>(null);
+  const listRef = React.useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -298,26 +278,18 @@ function PublicMessageList({ messages, currentUserId }: { messages: MessageDTO[]
   );
 }
 
-function PublicMessageInput({
-  onSendMessage,
-  onSendVoice,
-  onTyping,
-}: {
-  onSendMessage: (content: string) => void;
-  onSendVoice: (url: string, duration: string) => void;
-  onTyping: () => void;
-}) {
+function PublicMessageInput() {
   const { t } = useLanguage();
-  const { serverUrl, token } = useAuth();
+  const { token, serverUrl } = useAuth();
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const chunksRef = React.useRef<Blob[]>([]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim()) {
-      onSendMessage(message);
+      void sendText({ kind: 'public' }, message);
       setMessage('');
     }
   };
@@ -349,7 +321,7 @@ function PublicMessageInput({
           'url' in data &&
           typeof (data as { url: unknown }).url === 'string'
         ) {
-          onSendVoice((data as { url: string }).url, `${Math.round(blob.size / 10000)}s`);
+          void sendVoice({ kind: 'public' }, (data as { url: string }).url, `${Math.round(blob.size / 10000)}s`);
         }
         stream.getTracks().forEach((t) => t.stop());
       };
@@ -379,10 +351,7 @@ function PublicMessageInput({
         className="message-input"
         placeholder={t('placeholder')}
         value={message}
-        onChange={(e) => {
-          setMessage(e.target.value);
-          onTyping();
-        }}
+        onChange={(e) => setMessage(e.target.value)}
       />
       <button type="submit" className="send-btn" disabled={!message.trim()}>
         {t('send')}
@@ -392,304 +361,32 @@ function PublicMessageInput({
 }
 
 function AppContent() {
-  const { user, token, loading, serverUrl, logout } = useAuth();
-  const { t, language, setLanguage, languages, languageNames } = useLanguage();
-  const [currentUser, setCurrentUser] = useState<UserSummary | null>(null);
-  const [users, setUsers] = useState<OnlineUser[]>([]);
-  const [groups, setGroups] = useState<GroupSummary[]>([]);
-  const [messages, setMessages] = useState<MessageDTO[]>([]);
-  const [privateMessages, setPrivateMessages] = useState<Record<number, MessageDTO[]>>({});
-  const [groupMessages, setGroupMessages] = useState<Record<number, MessageDTO[]>>({});
-  const [privateChatUser, setPrivateChatUser] = useState<ChatPartner | null>(null);
-  const [selectedGroup, setSelectedGroup] = useState<GroupDetail | null>(null);
-  const [groupSettingsGroup, setGroupSettingsGroup] = useState<GroupDetail | null>(null);
-  const [unreadPrivate, setUnreadPrivate] = useState<UnreadMap>({});
-  const [unreadGroup, setUnreadGroup] = useState<UnreadMap>({});
-  const [privateTyping, setPrivateTyping] = useState<string | null>(null);
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [showUserSearch, setShowUserSearch] = useState(false);
-  const [showJoinGroup, setShowJoinGroup] = useState(false);
-  const [isWindowFocused, setIsWindowFocused] = useState(true);
-  const [mobileTab, setMobileTab] = useState<MobileTab>('public');
-  const socketRef = useRef<ChatSocket | null>(null);
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const serverUrlRef = useRef(serverUrl);
+  const { user, loading } = useAuth();
+  const rawToken = useAuth().token;
+  const token = rawToken ?? '';
+  const { t } = useLanguage();
 
-  useEffect(() => {
-    serverUrlRef.current = serverUrl;
-  }, [serverUrl]);
+  useChatConnection(
+    user ? { id: user.id, username: user.username, avatar: user.avatar } : null,
+    rawToken,
+  );
 
-  useEffect(() => {
-    const handleFocus = () => setIsWindowFocused(true);
-    const handleBlur = () => setIsWindowFocused(false);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('blur', handleBlur);
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('blur', handleBlur);
-    };
-  }, []);
+  const currentUser = useChatStore((s) => s.currentUser);
+  const users = useChatStore((s) => s.users);
+  const groups = useChatStore((s) => s.groups);
+  const messagesByConv = useChatStore((s) => s.messagesByConv);
+  const unreadPrivate = useChatStore((s) => s.unreadPrivate);
+  const unreadGroup = useChatStore((s) => s.unreadGroup);
+  const privateChatUser = useChatStore((s) => s.privateChatUser);
+  const selectedGroup = useChatStore((s) => s.selectedGroup);
+  const groupSettingsGroup = useChatStore((s) => s.groupSettingsGroup);
 
-  useEffect(() => {
-    if (user && token) {
-      const socket: ChatSocket = io(serverUrlRef.current, {
-        transports: ['websocket', 'polling'],
-        withCredentials: true,
-      });
-      socketRef.current = socket;
+  const mobileTab = useUiStore((s) => s.mobileTab);
+  const showCreateGroup = useUiStore((s) => s.showCreateGroup);
+  const showUserSearch = useUiStore((s) => s.showUserSearch);
+  const showJoinGroup = useUiStore((s) => s.showJoinGroup);
 
-      socket.on('connect', () => {
-        socket.emit('authenticate', { token });
-      });
 
-      socket.on('authenticated', async () => {
-        setCurrentUser({
-          id: user.id,
-          username: user.username,
-          avatar: user.avatar ?? null,
-        });
-        await loadHistory();
-      });
-
-      socket.on('user-list-update', (userList) => {
-        setUsers(userList.filter((u) => u.id !== user.id));
-      });
-
-      socket.on('user-left', ({ userId }) => {
-        setUsers((prev) => prev.filter((u) => u.id !== userId));
-      });
-
-      socket.on('group-list-update', ({ groups: groupList }) => {
-        setGroups(groupList);
-      });
-
-      socket.on('group-created', ({ group }) => {
-        setGroups((prev) => [...prev, group as GroupSummary]);
-      });
-
-      socket.on('receive-message', (message) => {
-        setMessages((prev) => [...prev, message]);
-        if (!isWindowFocused && message.senderId !== user.id) {
-          void showNotification(
-            'TianshangChat',
-            `${message.senderName}: ${message.content ?? '[语音消息]'}`,
-          );
-        }
-      });
-
-      socket.on('receive-private-message', ({ message, fromUser }) => {
-        const isSentByMe = message.senderId === user.id;
-        const chatPartnerId = (isSentByMe ? message.recipientId : fromUser.id) as number;
-
-        setPrivateMessages((prev) => ({
-          ...prev,
-          [chatPartnerId]: [...(prev[chatPartnerId] ?? []), message],
-        }));
-
-        if (privateChatUser?.id !== chatPartnerId) {
-          setUnreadPrivate((prev) => ({
-            ...prev,
-            [chatPartnerId]: (prev[chatPartnerId] ?? 0) + 1,
-          }));
-
-          if (!isWindowFocused && !isSentByMe) {
-            void showNotification('私聊消息', `${fromUser.username}: ${message.content ?? '[语音消息]'}`);
-          }
-        }
-      });
-
-      socket.on('private-typing-start', ({ username }) => {
-        if (privateChatUser) setPrivateTyping(username);
-      });
-
-      socket.on('private-typing-stop', () => {
-        setPrivateTyping(null);
-      });
-
-      socket.on('receive-group-message', ({ message, group }) => {
-        setGroupMessages((prev) => ({
-          ...prev,
-          [group.id]: [...(prev[group.id] ?? []), message],
-        }));
-        if (selectedGroup?.id !== group.id) {
-          setUnreadGroup((prev) => ({
-            ...prev,
-            [group.id]: (prev[group.id] ?? 0) + 1,
-          }));
-
-          if (!isWindowFocused && message.senderId !== user.id) {
-            void showNotification(`群聊: ${group.name}`, `${message.senderName}: ${message.content ?? '[语音消息]'}`);
-          }
-        }
-      });
-
-      socket.on('group-updated', ({ group }) => {
-        setGroups((prev) => prev.map((g) => (g.id === group.id ? (group as GroupSummary) : g)));
-        if (selectedGroup?.id === group.id) setSelectedGroup(group as GroupDetail);
-        if (groupSettingsGroup?.id === group.id) setGroupSettingsGroup(group as GroupDetail);
-      });
-
-      socket.on('member-joined', ({ group }) => {
-        setGroups((prev) => prev.map((g) => (g.id === group.id ? (group as GroupSummary) : g)));
-        if (selectedGroup?.id === group.id) setSelectedGroup(group as GroupDetail);
-      });
-
-      socket.on('member-left', ({ groupId }) => {
-        void fetch(`${serverUrl}/api/groups/${groupId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-          .then((r) => r.json())
-          .then((data: { success?: boolean; group?: GroupDetail }) => {
-            if (data.success && data.group) {
-              setGroups((prev) => prev.map((g) => (g.id === groupId ? toSummary(data.group as GroupDetail) : g)));
-              if (selectedGroup?.id === groupId) setSelectedGroup(data.group);
-            }
-          });
-      });
-
-      return () => {
-        socket.disconnect();
-      };
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, token]);
-
-  function toSummary(detail: GroupDetail): GroupSummary {
-    return {
-      id: detail.id,
-      name: detail.name,
-      creatorId: detail.creatorId,
-      maxMembers: detail.maxMembers,
-      createdAt: detail.createdAt,
-      creatorName: detail.creatorName,
-      role: 'member',
-      memberCount: detail.members.length,
-    };
-  }
-
-  async function loadHistory(): Promise<void> {
-    try {
-      const res = await fetch(`${serverUrl}/api/messages/history`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = (await res.json()) as { success?: boolean; messages?: MessageDTO[] };
-      if (data.success && data.messages) setMessages(data.messages);
-    } catch (error) {
-      console.error('Failed to load history:', error);
-    }
-  }
-
-  const openPrivateChat = async (targetUser: ChatPartner): Promise<void> => {
-    setPrivateChatUser(targetUser);
-    const newUnread = { ...unreadPrivate };
-    newUnread[targetUser.id] = 0;
-    setUnreadPrivate(newUnread);
-    try {
-      const res = await fetch(`${serverUrl}/api/messages/private/${targetUser.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = (await res.json()) as { success?: boolean; messages?: MessageDTO[] };
-      if (data.success && data.messages) {
-        setPrivateMessages((prev) => ({ ...prev, [targetUser.id]: data.messages as MessageDTO[] }));
-      }
-    } catch (error) {
-      console.error('Failed to load private messages:', error);
-    }
-  };
-
-  const selectGroup = async (group: GroupDetail): Promise<void> => {
-    setSelectedGroup(group);
-    const newUnread = { ...unreadGroup };
-    newUnread[group.id] = 0;
-    setUnreadGroup(newUnread);
-    try {
-      const res = await fetch(`${serverUrl}/api/groups/${group.id}/messages`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = (await res.json()) as { success?: boolean; messages?: MessageDTO[] };
-      if (data.success && data.messages) {
-        setGroupMessages((prev) => ({ ...prev, [group.id]: data.messages as MessageDTO[] }));
-      }
-    } catch (error) {
-      console.error('Failed to load group messages:', error);
-    }
-  };
-
-  const handleCreateGroup = (name: string, memberIds: number[]) => {
-    socketRef.current?.emit('create-group', { name, memberIds });
-  };
-
-  const sendPublicMessage = (content: string) => socketRef.current?.emit('send-message', { content });
-  const sendGroupMessage = (groupId: number, content: string) =>
-    socketRef.current?.emit('send-group-message', { groupId, content });
-  const sendPrivateMessage = (recipientId: number, content: string) =>
-    socketRef.current?.emit('send-private-message', { recipientId, content });
-  const sendPublicVoice = (url: string, duration: string) =>
-    socketRef.current?.emit('send-voice', { audioUrl: url, duration });
-  const sendGroupVoice = (groupId: number, url: string, duration: string) =>
-    socketRef.current?.emit('send-group-voice', { groupId, audioUrl: url, duration });
-  const sendPrivateVoice = (recipientId: number, url: string, duration: string) =>
-    socketRef.current?.emit('send-private-voice', { recipientId, audioUrl: url, duration });
-
-  const handleTyping = () => {
-    socketRef.current?.emit('typing');
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => socketRef.current?.emit('stop-typing'), 2000);
-  };
-  const handlePrivateTyping = (recipientId: number) => {
-    socketRef.current?.emit('private-typing', { recipientId });
-  };
-
-  const addGroupMember = async (groupId: number, userId: number): Promise<void> => {
-    await fetch(`${serverUrl}/api/groups/${groupId}/members`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-    });
-  };
-
-  const removeGroupMember = async (groupId: number, userId: number): Promise<void> => {
-    await fetch(`${serverUrl}/api/groups/${groupId}/members/${userId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  };
-
-  const setAdmin = async (groupId: number, userId: number, isAdmin: boolean): Promise<void> => {
-    await fetch(`${serverUrl}/api/groups/${groupId}/admin/${userId}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isAdmin }),
-    });
-  };
-
-  const transferOwner = async (groupId: number, newOwnerId: number): Promise<void> => {
-    await fetch(`${serverUrl}/api/groups/${groupId}/transfer`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newOwnerId }),
-    });
-  };
-
-  const leaveGroup = async (groupId: number): Promise<void> => {
-    await fetch(`${serverUrl}/api/groups/${groupId}/leave`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    socketRef.current?.emit('leave-group', { groupId });
-    if (selectedGroup?.id === groupId) setSelectedGroup(null);
-  };
-
-  const deleteGroup = async (groupId: number): Promise<void> => {
-    if (confirm('Delete this group?')) {
-      await fetch(`${serverUrl}/api/groups/${groupId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (selectedGroup?.id === groupId) setSelectedGroup(null);
-      setGroupSettingsGroup(null);
-    }
-  };
 
   if (loading)
     return (
@@ -720,12 +417,15 @@ function AppContent() {
         <PrivateChatPanel
           user={privateChatUser}
           currentUserId={currentUser?.id}
-          messages={privateMessages[privateChatUser.id] ?? []}
-          onSendMessage={(content) => sendPrivateMessage(privateChatUser.id, content)}
-          onSendVoice={(url, duration) => sendPrivateVoice(privateChatUser.id, url, duration)}
-          onTyping={() => handlePrivateTyping(privateChatUser.id)}
-          onClose={() => setPrivateChatUser(null)}
-          typingUser={privateTyping}
+          messages={messagesByConv[`p:${privateChatUser.id}`] ?? []}
+          onSendMessage={(content) =>
+            void sendText({ kind: 'private', peerId: privateChatUser.id }, content)
+          }
+          onSendVoice={(url, duration) =>
+            void sendVoice({ kind: 'private', peerId: privateChatUser.id }, url, duration)
+          }
+          onTyping={() => {}}
+          onClose={() => useChatStore.getState().closePrivateChat()}
         />
       );
     }
@@ -734,12 +434,14 @@ function AppContent() {
       return (
         <GroupChat
           group={selectedGroup}
-          messages={groupMessages[selectedGroup.id] ?? []}
+          messages={messagesByConv[`g:${selectedGroup.id}`] ?? []}
           currentUser={currentUser}
-          onSendMessage={(content) => sendGroupMessage(selectedGroup.id, content)}
-          onSendVoice={(url, duration) => sendGroupVoice(selectedGroup.id, url, duration)}
+          onSendMessage={(content) => void sendText({ kind: 'group', groupId: selectedGroup.id }, content)}
+          onSendVoice={(url, duration) =>
+            void sendVoice({ kind: 'group', groupId: selectedGroup.id }, url, duration)
+          }
           onTyping={() => {}}
-          onOpenSettings={() => setGroupSettingsGroup(selectedGroup)}
+          onOpenSettings={() => useChatStore.getState().setGroupSettingsGroup(selectedGroup)}
         />
       );
     }
@@ -756,18 +458,22 @@ function AppContent() {
                 </span>
               </div>
             </div>
-            <PublicMessageList messages={messages} currentUserId={currentUser?.id} />
-            <PublicMessageInput onSendMessage={sendPublicMessage} onSendVoice={sendPublicVoice} onTyping={handleTyping} />
+            <PublicMessageList messages={messagesByConv['public'] ?? []} currentUserId={currentUser?.id} />
+            <PublicMessageInput />
           </div>
         );
       case 'private':
         return (
           <div style={{ position: 'relative', height: '100%' }}>
             <RecentChats
-              onSelectChat={(u) => void openPrivateChat(u)}
+              onSelectChat={(partner) => {
+                useChatStore.getState().openPrivateChat(partner);
+                useChatStore.getState().clearUnreadPrivate(partner.id);
+                void openPrivateConversation(token, partner.id);
+              }}
               unreadCounts={unreadPrivate}
             />
-            <button className="fab-button" onClick={() => setShowUserSearch(true)} style={{ position: 'absolute', bottom: '80px', right: '20px', width: '56px', height: '56px', borderRadius: '50%', background: 'var(--primary-color)', color: 'white', border: 'none', fontSize: '1.5rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button className="fab-button" onClick={() => useUiStore.getState().setShowUserSearch(true)} style={{ position: 'absolute', bottom: '80px', right: '20px', width: '56px', height: '56px', borderRadius: '50%', background: 'var(--primary-color)', color: 'white', border: 'none', fontSize: '1.5rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               +
             </button>
           </div>
@@ -778,21 +484,32 @@ function AppContent() {
             <div className="mobile-group-header">
               <h2>{t('myGroups')}</h2>
               <div className="group-actions">
-                <button className="group-action-btn" onClick={() => setShowJoinGroup(true)}>+</button>
+                <button className="group-action-btn" onClick={() => useUiStore.getState().setShowJoinGroup(true)}>+</button>
               </div>
             </div>
             <div className="mobile-group-list-content">
               {groups.length === 0 ? (
                 <div className="mobile-empty-groups">
                   <span>{t('noGroups')}</span>
-                  <button onClick={() => setShowCreateGroup(true)}>{t('createGroup')}</button>
+                  <button onClick={() => useUiStore.getState().setShowCreateGroup(true)}>{t('createGroup')}</button>
                 </div>
               ) : (
                 groups.map((group) => (
                   <div
                     key={group.id}
                     className="mobile-group-item"
-                    onClick={() => void selectGroup(toDetailStub(group))}
+                    onClick={() => {
+                      if (!token) return;
+                      void (async () => {
+                        const { api } = await import('./data/apiClient');
+                        const detail = await api.groupDetail(token, group.id);
+                        if (!detail) return;
+                        const st = useChatStore.getState();
+                        st.setSelectedGroup(detail);
+                        st.clearUnreadGroup(group.id);
+                        await openGroupConversation(token, group.id);
+                      })();
+                    }}
                   >
                     <span className="mobile-group-icon">👥</span>
                     <div className="mobile-group-info">
@@ -809,66 +526,46 @@ function AppContent() {
           </div>
         );
       case 'settings':
-        return (
-          <div className="settings-panel">
-            <h2>{t('settings')}</h2>
-            <div className="settings-section">
-              <label>{t('language')}</label>
-              <div className="language-options">
-                {languages.map((lang) => (
-                  <button
-                    key={lang}
-                    className={`lang-option ${language === lang ? 'active' : ''}`}
-                    onClick={() => setLanguage(lang)}
-                  >
-                    {languageNames[lang]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button className="logout-btn-mobile" onClick={() => void logout()}>
-              {t('logout')}
-            </button>
-          </div>
-        );
+        return <SettingsPanel />;
       default:
         return null;
     }
   };
 
-  function toDetailStub(summary: GroupSummary): GroupDetail {
-    return {
-      id: summary.id,
-      name: summary.name,
-      creatorId: summary.creatorId,
-      maxMembers: summary.maxMembers,
-      createdAt: summary.createdAt,
-      creatorName: summary.creatorName,
-      members: [],
-    };
-  }
+  const groupUseCases = makeGroupUseCases(token);
 
   return (
     <>
       {isAndroid ? (
         <div className="app-container">
           <div className="main-chat-area">{renderMobileContent()}</div>
-          <BottomNav activeTab={mobileTab} onTabChange={setMobileTab} />
+          <BottomNav activeTab={mobileTab} onTabChange={useUiStore.getState().setMobileTab} />
           {showUserSearch && (
             <UserSearchModal
-              onClose={() => setShowUserSearch(false)}
-              onSelectUser={(u) => {
-                void openPrivateChat(u);
-                setMobileTab('public');
+              onClose={() => useUiStore.getState().setShowUserSearch(false)}
+              onSelectUser={(partner) => {
+                useChatStore.getState().openPrivateChat(partner);
+                useChatStore.getState().clearUnreadPrivate(partner.id);
+                void openPrivateConversation(token, partner.id);
+                useUiStore.getState().setMobileTab('public');
               }}
             />
           )}
           {showJoinGroup && (
             <JoinGroupModal
-              onClose={() => setShowJoinGroup(false)}
+              onClose={() => useUiStore.getState().setShowJoinGroup(false)}
               onJoinSuccess={(group) => {
-                void selectGroup(group as GroupDetail);
-                setMobileTab('public');
+                useChatStore.getState().upsertGroup(group);
+                void (async () => {
+                  const { api } = await import('./data/apiClient');
+                  const detail = await api.groupDetail(token, group.id);
+                  if (!detail) return;
+                  const st = useChatStore.getState();
+                  st.setSelectedGroup(detail);
+                  st.clearUnreadGroup(group.id);
+                  await openGroupConversation(token, group.id);
+                })();
+                useUiStore.getState().setMobileTab('public');
               }}
             />
           )}
@@ -876,65 +573,65 @@ function AppContent() {
             <CreateGroupModal
               users={users}
               currentUser={currentUser}
-              onClose={() => setShowCreateGroup(false)}
-              onCreate={handleCreateGroup}
+              onClose={() => useUiStore.getState().setShowCreateGroup(false)}
+              onCreate={(name, memberIds) => {
+                // create-group flows over the socket; store updates arrive via
+                // group-created / group-list-update events.
+                void (async () => {
+                  const { getSocket } = await import('./data/socketAdapter');
+                  getSocket()?.emit('create-group', { name, memberIds });
+                })();
+              }}
             />
           )}
           {groupSettingsGroup && (
             <GroupSettingsModal
               group={groupSettingsGroup}
               currentUser={currentUser}
-              onClose={() => setGroupSettingsGroup(null)}
-              onAddMember={(userId) => void addGroupMember(groupSettingsGroup.id, userId)}
-              onRemoveMember={(userId) => void removeGroupMember(groupSettingsGroup.id, userId)}
-              onSetAdmin={(userId, isAdmin) => void setAdmin(groupSettingsGroup.id, userId, isAdmin)}
-              onTransferOwner={(userId) => void transferOwner(groupSettingsGroup.id, userId)}
-              onLeaveGroup={() => void leaveGroup(groupSettingsGroup.id)}
-              onDeleteGroup={() => void deleteGroup(groupSettingsGroup.id)}
+              onClose={() => useChatStore.getState().setGroupSettingsGroup(null)}
+              onAddMember={(userId) => void groupUseCases.addMember(groupSettingsGroup.id, userId)}
+              onRemoveMember={(userId) => void groupUseCases.removeMember(groupSettingsGroup.id, userId)}
+              onSetAdmin={(userId, isAdmin) =>
+                void groupUseCases.setAdmin(groupSettingsGroup.id, userId, isAdmin)
+              }
+              onTransferOwner={(userId) => void groupUseCases.transferOwner(groupSettingsGroup.id, userId)}
+              onLeaveGroup={() => void groupUseCases.leave(groupSettingsGroup.id)}
+              onDeleteGroup={() => void groupUseCases.remove(groupSettingsGroup.id)}
             />
           )}
         </div>
       ) : (
-        <ChatLayout
-          currentUser={currentUser}
-          users={users}
-          groups={groups}
-          messages={messages}
-          privateMessages={privateMessages}
-          groupMessages={groupMessages}
-          privateChatUser={privateChatUser}
-          selectedGroup={selectedGroup}
-          groupSettingsGroup={groupSettingsGroup}
-          unreadPrivate={unreadPrivate}
-          unreadGroup={unreadGroup}
-          privateTyping={privateTyping}
-          onOpenPrivateChat={(u) => void openPrivateChat(u)}
-          onClosePrivateChat={() => setPrivateChatUser(null)}
-          onSelectGroup={(g) => void selectGroup(g)}
-          onOpenGroupSettings={setGroupSettingsGroup}
-          onCloseGroupSettings={() => setGroupSettingsGroup(null)}
-          onSendMessage={sendPublicMessage}
-          onSendPrivateMessage={sendPrivateMessage}
-          onSendGroupMessage={sendGroupMessage}
-          onSendVoice={sendPublicVoice}
-          onSendPrivateVoice={sendPrivateVoice}
-          onSendGroupVoice={sendGroupVoice}
-          onTyping={handleTyping}
-          onPrivateTyping={handlePrivateTyping}
-          onCreateGroup={() => setShowCreateGroup(true)}
-          onJoinGroup={(g) => {
-            socketRef.current?.emit('join-group', { groupId: g.id });
-            void selectGroup(g);
-          }}
-          onAddGroupMember={(groupId, userId) => void addGroupMember(groupId, userId)}
-          onRemoveGroupMember={(groupId, userId) => void removeGroupMember(groupId, userId)}
-          onSetAdmin={(groupId, userId, isAdmin) => void setAdmin(groupId, userId, isAdmin)}
-          onTransferOwner={(groupId, userId) => void transferOwner(groupId, userId)}
-          onLeaveGroup={(groupId) => void leaveGroup(groupId)}
-          onDeleteGroup={(groupId) => void deleteGroup(groupId)}
-        />
+        <ChatLayout />
       )}
     </>
+  );
+}
+
+function SettingsPanel() {
+  const { t, language, setLanguage, languages, languageNames } = useLanguage();
+  const { logout } = useAuth();
+
+  return (
+    <div className="settings-panel">
+      <h2>{t('settings')}</h2>
+      <div className="settings-section">
+        <label>{t('language')}</label>
+        <div className="language-options">
+          {languages.map((lang) => (
+            <button
+              key={lang}
+              className={`lang-option ${language === lang ? 'active' : ''}`}
+              onClick={() => setLanguage(lang)}
+            >
+              {languageNames[lang]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <button className="logout-btn-mobile" onClick={() => void logout()}>
+        {t('logout')}
+      </button>
+    </div>
   );
 }
 

@@ -1,4 +1,4 @@
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const isAndroid = typeof window !== 'undefined' && window.Capacitor !== undefined;
 

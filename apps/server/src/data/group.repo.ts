@@ -210,3 +210,13 @@ export function isFull(groupId: number): boolean {
   if (!group) return true;
   return getMemberCount(groupId) >= group.maxMembers;
 }
+
+/** Plain member id list — used for receipt fan-out. */
+export function getMemberUserIds(groupId: number): number[] {
+  return db
+    .select({ userId: groupMembers.userId })
+    .from(groupMembers)
+    .where(eq(groupMembers.groupId, groupId))
+    .all()
+    .map((r) => r.userId);
+}

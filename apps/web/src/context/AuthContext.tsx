@@ -210,6 +210,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
+    try {
+      const { wipeLocalData } = await import('../domain/sync');
+      await wipeLocalData();
+    } catch (err) {
+      console.error('Local cache wipe failed:', err);
+    }
   }, [token]);
 
   const updateUserAvatar = (avatarUrl: string) => {

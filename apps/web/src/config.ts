@@ -21,9 +21,15 @@ export function getServerUrl(serverIp?: string | null): string {
   return `http://${hostname}:${SERVER_PORT}`;
 }
 
+import { configureSocketUrl } from './data/socketAdapter';
+
 export const SERVER_URL = getServerUrl();
 export const API_URL = `${SERVER_URL}/api`;
 export const SOCKET_URL = SERVER_URL;
+
+// Socket adapter reads the base URL through this injection point so the
+// Android IP switch keeps working without reloads.
+configureSocketUrl(SERVER_URL);
 
 /** URL of the dev-served page itself (used by Capacitor shell flows). */
 export function getBaseUrl(): string {

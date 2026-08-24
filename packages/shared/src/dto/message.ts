@@ -71,3 +71,13 @@ export const UnreadCountResponseSchema = z.object({
 });
 
 export type UnreadCountResponse = z.infer<typeof UnreadCountResponseSchema>;
+
+/** Incremental sync response (`GET /api/sync?cursor=`). */
+export const SyncResponseSchema = z.object({
+  success: z.literal(true),
+  messages: z.array(MessageDTOSchema),
+  /** Highest message id in this batch; pass back as next cursor. */
+  nextCursor: z.number().int(),
+});
+
+export type SyncResponse = z.infer<typeof SyncResponseSchema>;

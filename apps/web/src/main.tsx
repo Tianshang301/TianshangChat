@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 
+// PWA: service worker registration is injected by vite-plugin-pwa at build time.
+
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element not found');
 

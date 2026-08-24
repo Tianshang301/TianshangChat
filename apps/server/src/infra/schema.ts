@@ -64,6 +64,8 @@ export const messages = sqliteTable(
     timestamp: text('timestamp')
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
+    /** ISO timestamp when the server pushed this message to its recipient(s). */
+    deliveredAt: text('delivered_at'),
     isRead: integer('is_read').notNull().default(0),
   },
   (t) => [

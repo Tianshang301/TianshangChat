@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { db } from '../infra/db.js';
 import { messages } from '../infra/schema.js';
 import type { MessageKind } from '@tianshangchat/shared';
@@ -195,6 +195,73 @@ export function markPrivateAsRead(recipientId: number, senderId: number): void {
       ),
     )
     .run();
+}
+
+/* ------------------------------------------------------------------ */
+/* Receipts                                                            */
+/* ------------------------------------------------------------------ */
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+/** Marks the given messages as delivered for this recipient; returns the ids actually updated. */
+export function markDelivered(messageIds: number[], recipientId: number | null, groupId: number | null): number[] {
+  const updated: number[] = [];
+  const stmt = db
+    .update(messages)
+    .set({ deliveredAt: nowIso() })
+    .where(and(inArray(messages.id, messageIds), eq(messages.isRead, 0)))
+    .returning({ id: messages.id, recipientId: messages.recipientId, groupId: messages.groupId });
+  for (const row of stmt.all()) {
+    const matches =
+      recipientId !== null ? row.recipientId === recipientId : row.groupId === groupId;
+    if (matches) updated.push(row.id);
+  }
+  return updated;
+}
+
+/** Marks specific messages read for this recipient (private scope). */
+export function markReadPrivate(messageIds: number[], recipientId: number): number[] {
+  const rows = db
+    .update(messages)
+    .set({ isRead: 1 })
+    .where(
+      and(
+        inArray(messages.id, messageIds),
+        eq(messages.recipientId, recipientId),
+        eq(messages.isRead, 0),
+      ),
+    )
+    .returning({ id: messages.id });
+  return rows.all().map((r) => r.id);
+}
+
+/** Marks specific group messages read for this reader. */
+export function markReadGroup(messageIds: number[], groupId: number, readerId: number): number[] {
+  const rows = db
+    .update(messages)
+    .set({ isRead: 1 })
+    .where(
+      and(
+        inArray(messages.id, messageIds),
+        eq(messages.groupId, groupId),
+        sql`sender_id != ${readerId}`,
+        eq(messages.isRead, 0),
+      ),
+    )
+    .returning({ id: messages.id });
+  return rows.all().map((r) => r.id);
+}
+
+/** Author lookup used to route receipt notifications back to original senders. */
+export function getMessageSenders(messageIds: number[]): Map<number, number> {
+  const rows = db
+    .select({ id: messages.id, senderId: messages.senderId })
+    .from(messages)
+    .where(inArray(messages.id, messageIds))
+    .all();
+  return new Map(rows.map((r) => [r.id, r.senderId]));
 }
 
 export function markGroupAsRead(groupId: number, userId: number): void {
