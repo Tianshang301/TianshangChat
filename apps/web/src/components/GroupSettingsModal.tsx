@@ -1,14 +1,36 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { SERVER_URL } from '../config';
+import type { GroupDetail, GroupRole, UserSummary } from '@tianshangchat/shared';
 
-function GroupSettingsModal({ group, currentUser, onClose, onAddMember, onRemoveMember, onSetAdmin, onTransferOwner, onLeaveGroup, onDeleteGroup }) {
+function GroupSettingsModal({
+  group,
+  currentUser,
+  onClose,
+  onAddMember,
+  onRemoveMember,
+  onSetAdmin,
+  onTransferOwner,
+  onLeaveGroup,
+  onDeleteGroup,
+}: {
+  group: GroupDetail;
+  currentUser?: UserSummary | null;
+  onClose: () => void;
+  onAddMember: (userId: number) => void;
+  onRemoveMember: (userId: number) => void;
+  onSetAdmin: (userId: number, isAdmin: boolean) => void;
+  onTransferOwner: (userId: number) => void;
+  onLeaveGroup: () => void;
+  onDeleteGroup: () => void;
+}) {
   const { t } = useLanguage();
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberId, setNewMemberId] = useState('');
 
-  const isCreator = group.creator_id === currentUser?.id;
-  const canManage = isCreator || group.role === 'admin';
+  const isCreator = group.creatorId === currentUser?.id;
+  const myRole: GroupRole | undefined = group.members.find((m) => m.userId === currentUser?.id)?.role;
+  const canManage = isCreator || myRole === 'admin';
 
   const handleAddMember = () => {
     if (newMemberId) {
@@ -27,7 +49,7 @@ function GroupSettingsModal({ group, currentUser, onClose, onAddMember, onRemove
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content settings-modal" onClick={e => e.stopPropagation()}>
+      <div className="modal-content settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{t('groupSettings')}</h3>
           <button className="close-btn" onClick={onClose}>×</button>
@@ -36,15 +58,15 @@ function GroupSettingsModal({ group, currentUser, onClose, onAddMember, onRemove
           <div className="settings-section">
             <h4>{t('groupInfo')}</h4>
             <p><strong>{t('groupName')}:</strong> {group.name}</p>
-            <p><strong>{t('creator')}:</strong> {group.creator_name}</p>
-            <p><strong>{t('members')}:</strong> {(group.members || []).length}</p>
+            <p><strong>{t('creator')}:</strong> {group.creatorName}</p>
+            <p><strong>{t('members')}:</strong> {(group.members ?? []).length}</p>
           </div>
 
           <div className="settings-section">
             <h4>{t('members')}</h4>
             <div className="member-list">
-              {(group.members || []).map((member) => (
-                <div key={member.user_id} className="member-item">
+              {(group.members ?? []).map((member) => (
+                <div key={member.userId} className="member-item">
                   <div className="member-info">
                     {member.avatar ? (
                       <img src={`${SERVER_URL}${member.avatar}`} alt="" className="member-avatar" />
@@ -55,19 +77,19 @@ function GroupSettingsModal({ group, currentUser, onClose, onAddMember, onRemove
                     {member.role === 'creator' && <span className="role-badge owner">👑 {t('creator')}</span>}
                     {member.role === 'admin' && <span className="role-badge admin">⭐ {t('admin')}</span>}
                   </div>
-                  {canManage && member.user_id !== currentUser?.id && (
+                  {canManage && member.userId !== currentUser?.id && (
                     <div className="member-actions">
-                      {isCreator && member.role !== 'admin' && (
-                        <button className="action-btn" onClick={() => onSetAdmin(member.user_id, true)}>
+                      {isCreator && member.role !== ('admin' satisfies GroupRole) && member.role !== 'creator' && (
+                        <button className="action-btn" onClick={() => onSetAdmin(member.userId, true)}>
                           {t('setAdmin')}
                         </button>
                       )}
                       {isCreator && member.role === 'admin' && (
-                        <button className="action-btn" onClick={() => onSetAdmin(member.user_id, false)}>
+                        <button className="action-btn" onClick={() => onSetAdmin(member.userId, false)}>
                           {t('removeAdmin')}
                         </button>
                       )}
-                      <button className="action-btn danger" onClick={() => onRemoveMember(member.user_id)}>
+                      <button className="action-btn danger" onClick={() => onRemoveMember(member.userId)}>
                         {t('remove')}
                       </button>
                     </div>

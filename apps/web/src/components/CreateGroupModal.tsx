@@ -1,19 +1,28 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { SERVER_URL } from '../config';
+import type { OnlineUser } from '@tianshangchat/shared';
 
-function CreateGroupModal({ users, currentUser, onClose, onCreate }) {
+function CreateGroupModal({
+  users,
+  currentUser,
+  onClose,
+  onCreate,
+}: {
+  users: OnlineUser[];
+  currentUser?: { id: number } | null;
+  onClose: () => void;
+  onCreate: (name: string, memberIds: number[]) => void;
+}) {
   const { t } = useLanguage();
   const [name, setName] = useState('');
-  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
 
-  const otherUsers = users.filter(u => u.id !== currentUser?.id);
+  const otherUsers = users.filter((u) => u.id !== currentUser?.id);
 
-  const toggleUser = (userId) => {
-    setSelectedUsers(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
+  const toggleUser = (userId: number) => {
+    setSelectedUsers((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
     );
   };
 
@@ -26,7 +35,7 @@ function CreateGroupModal({ users, currentUser, onClose, onCreate }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{t('createGroup')}</h3>
           <button className="close-btn" onClick={onClose}>×</button>
@@ -47,7 +56,7 @@ function CreateGroupModal({ users, currentUser, onClose, onCreate }) {
             <label>{t('selectMembers')}</label>
             <div className="user-select-list">
               {otherUsers.map((user) => (
-                <div 
+                <div
                   key={user.id}
                   className={`user-select-item ${selectedUsers.includes(user.id) ? 'selected' : ''}`}
                   onClick={() => toggleUser(user.id)}

@@ -1,15 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { SERVER_URL, API_URL } from '../config';
+import { SERVER_URL } from '../config';
 import VoicePlayer from './VoicePlayer';
+import type { GroupDetail, MessageDTO, UserSummary } from '@tianshangchat/shared';
 
-function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, onTyping, onOpenSettings }) {
+function GroupChat({
+  group,
+  messages,
+  currentUser,
+  onSendMessage,
+  onSendVoice,
+  onTyping,
+  onOpenSettings,
+}: {
+  group: GroupDetail;
+  messages: MessageDTO[];
+  currentUser?: UserSummary | null;
+  onSendMessage: (content: string) => void;
+  onSendVoice: (url: string, duration: string) => void;
+  onTyping: () => void;
+  onOpenSettings: () => void;
+}) {
   const { t } = useLanguage();
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const listRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -17,7 +34,7 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
     }
   }, [messages]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim()) {
       onSendMessage(message);
@@ -25,40 +42,39 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      handleSubmit(e as unknown as React.FormEvent);
     }
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
     onTyping();
   };
 
-  const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const formatTime = (timestamp: string): string =>
+    new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
-      mediaRecorderRef.current.ondataavailable = (e) => {
+      recorder.ondataavailable = (e: BlobEvent) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      mediaRecorderRef.current.onstop = async () => {
+      recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         await uploadAudio(blob);
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       };
 
-      mediaRecorderRef.current.start();
+      recorder.start();
       setIsRecording(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -66,25 +82,30 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
   };
 
-  const uploadAudio = async (blob) => {
+  const uploadAudio = async (blob: Blob) => {
     const formData = new FormData();
     formData.append('voice', blob, 'voice.webm');
     try {
-      const response = await fetch(`${API_URL}/upload/voice`, {
+      const response = await fetch(`${SERVER_URL}/api/upload/voice`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: formData
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: formData,
       });
-      const data = await response.json();
-      if (data.success) {
+      const data: unknown = await response.json();
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        'success' in data &&
+        (data as { success: boolean }).success &&
+        'url' in data &&
+        typeof (data as { url: unknown }).url === 'string'
+      ) {
         const duration = Math.round(blob.size / 10000);
-        onSendVoice(data.url, `${duration}s`);
+        onSendVoice((data as { url: string }).url, `${duration}s`);
       }
     } catch (error) {
       console.error('Upload failed:', error);
@@ -98,7 +119,9 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
           <span className="group-icon">👥</span>
           <div className="group-details">
             <span className="group-name">{group.name}</span>
-            <span className="member-count">{(group.members || []).length} {t('members')}</span>
+            <span className="member-count">
+              {(group.members ?? []).length} {t('members')}
+            </span>
           </div>
         </div>
         <button className="settings-btn" onClick={onOpenSettings}>⚙️</button>
@@ -106,8 +129,8 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
 
       <div className="group-messages" ref={listRef}>
         {messages.map((msg) => (
-          <div 
-            key={msg.id} 
+          <div
+            key={msg.id}
             className={`message ${msg.senderId === currentUser?.id ? 'own' : ''}`}
           >
             {msg.senderId !== currentUser?.id && (
@@ -118,14 +141,9 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
               )
             )}
             <div className="message-content">
-              {msg.senderId !== currentUser?.id && (
-                <div className="message-sender">{msg.senderName}</div>
-              )}
+              {msg.senderId !== currentUser?.id && <div className="message-sender">{msg.senderName}</div>}
               {msg.type === 'voice' ? (
-                <VoicePlayer
-                  audioUrl={`${SERVER_URL}${msg.audioUrl}`}
-                  duration={msg.duration}
-                />
+                <VoicePlayer audioUrl={`${SERVER_URL}${msg.audioUrl ?? ''}`} duration={msg.duration} />
               ) : (
                 <div className="message-text">{msg.content}</div>
               )}
@@ -139,7 +157,7 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
         <button
           type="button"
           className={`icon-btn ${isRecording ? 'recording' : ''}`}
-          onClick={isRecording ? stopRecording : startRecording}
+          onClick={isRecording ? stopRecording : () => void startRecording()}
         >
           {isRecording ? '⏹' : '🎤'}
         </button>

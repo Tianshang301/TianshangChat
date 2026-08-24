@@ -2,33 +2,56 @@ import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 
-function UserSearchModal({ onClose, onSelectUser }) {
+interface SearchedUser {
+  id: number;
+  username: string;
+  avatar: string | null;
+  createdAt?: string;
+}
+
+function UserSearchModal({
+  onClose,
+  onSelectUser,
+}: {
+  onClose: () => void;
+  onSelectUser: (user: SearchedUser) => void;
+}) {
   const { t } = useLanguage();
   const { token, serverUrl } = useAuth();
   const [query, setQuery] = useState('');
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<SearchedUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const searchUsers = async () => {
     if (query.length < 1) return;
-    
+
     setLoading(true);
     setError('');
-    
+
     try {
-      const response = await fetch(`${serverUrl}/api/users/search?q=${encodeURIComponent(query)}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        setUsers(data.users);
-        if (data.users.length === 0) {
+      const response = await fetch(
+        `${serverUrl}/api/users/search?q=${encodeURIComponent(query)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      const data: unknown = await response.json();
+
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        'success' in data &&
+        (data as { success: boolean }).success &&
+        'users' in data
+      ) {
+        const found = (data as { users: SearchedUser[] }).users;
+        setUsers(found);
+        if (found.length === 0) {
           setError(t('userNotFound') || 'No users found');
         }
       } else {
-        setError(data.error || 'Search failed');
+        setError('Search failed');
       }
     } catch (err) {
       console.error('Search error:', err);
@@ -38,15 +61,15 @@ function UserSearchModal({ onClose, onSelectUser }) {
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      searchUsers();
+      void searchUsers();
     }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content mobile-modal" onClick={e => e.stopPropagation()}>
+      <div className="modal-content mobile-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{t('searchUser')}</h3>
           <button className="close-btn" onClick={onClose}>×</button>
@@ -62,19 +85,22 @@ function UserSearchModal({ onClose, onSelectUser }) {
               onKeyPress={handleKeyPress}
               autoFocus
             />
-            <button className="search-btn" onClick={searchUsers} disabled={loading}>
+            <button className="search-btn" onClick={() => void searchUsers()} disabled={loading}>
               {loading ? '...' : '🔍'}
             </button>
           </div>
-          
+
           {error && <div className="search-error">{error}</div>}
-          
+
           <div className="search-results">
             {users.map((user) => (
               <div
                 key={user.id}
                 className="search-user-item"
-                onClick={() => { onSelectUser(user); onClose(); }}
+                onClick={() => {
+                  onSelectUser(user);
+                  onClose();
+                }}
               >
                 {user.avatar ? (
                   <img src={`${serverUrl}${user.avatar}`} alt="" className="user-avatar-small" />

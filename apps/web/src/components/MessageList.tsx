@@ -1,13 +1,24 @@
-import React, { useEffect, useRef, useState } from 'react';
-import MessageInput from './MessageInput';
-import VoiceRecorder from './VoiceRecorder';
-import { useLanguage } from '../context/LanguageContext';
+import { useEffect, useRef, useState } from 'react';
 import { SERVER_URL } from '../config';
+import type { MessageDTO } from '@tianshangchat/shared';
 
-function MessageList({ messages, currentUserId }) {
-  const listRef = useRef(null);
-  const [playingId, setPlayingId] = useState(null);
-  const audioRef = useRef(null);
+interface GroupedItem {
+  key: string;
+  kind: 'date' | 'message';
+  date?: string;
+  message?: MessageDTO;
+}
+
+function MessageList({
+  messages,
+  currentUserId,
+}: {
+  messages: MessageDTO[];
+  currentUserId?: number | null;
+}) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (listRef.current) {
@@ -15,23 +26,24 @@ function MessageList({ messages, currentUserId }) {
     }
   }, [messages]);
 
-  const playVoice = (message) => {
+  const playVoice = (message: MessageDTO) => {
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    audioRef.current = new Audio(`${SERVER_URL}${message.audioUrl}`);
-    audioRef.current.onended = () => setPlayingId(null);
-    audioRef.current.onerror = () => setPlayingId(null);
-    audioRef.current.play();
+    if (!message.audioUrl) return;
+    const audio = new Audio(`${SERVER_URL}${message.audioUrl}`);
+    audioRef.current = audio;
+    audio.onended = () => setPlayingId(null);
+    audio.onerror = () => setPlayingId(null);
+    void audio.play();
     setPlayingId(message.id);
   };
 
-  const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatTime = (timestamp: string): string => {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const formatDate = (timestamp) => {
+  const formatDate = (timestamp: string): string => {
     const date = new Date(timestamp);
     const today = new Date();
     if (date.toDateString() === today.toDateString()) {
@@ -40,37 +52,34 @@ function MessageList({ messages, currentUserId }) {
     return date.toLocaleDateString();
   };
 
-  const groupedMessages = [];
-  let lastDate = null;
+  const groupedMessages: GroupedItem[] = [];
+  let lastDate: string | null = null;
 
   messages.forEach((msg) => {
     const msgDate = new Date(msg.timestamp).toDateString();
     if (msgDate !== lastDate) {
-      groupedMessages.push({ type: 'date', date: msg.timestamp, key: `date-${msg.id}` });
+      groupedMessages.push({ kind: 'date', date: msg.timestamp, key: `date-${msg.id}` });
       lastDate = msgDate;
     }
-    groupedMessages.push({ ...msg, key: msg.id });
+    groupedMessages.push({ kind: 'message', message: msg, key: String(msg.id) });
   });
 
   return (
     <div className="message-list" ref={listRef}>
       {groupedMessages.map((item) => {
-        if (item.type === 'date') {
+        if (item.kind === 'date') {
           return (
             <div key={item.key} className="date-separator">
-              {formatDate(item.date)}
+              {formatDate(item.date ?? '')}
             </div>
           );
         }
 
-        const message = item;
+        const message = item.message as MessageDTO;
         const isOwn = message.senderId === currentUserId;
 
         return (
-          <div
-            key={message.key}
-            className={`message ${isOwn ? 'own' : ''}`}
-          >
+          <div key={item.key} className={`message ${isOwn ? 'own' : ''}`}>
             {message.senderAvatar ? (
               <img
                 src={`${SERVER_URL}${message.senderAvatar}`}
@@ -78,9 +87,7 @@ function MessageList({ messages, currentUserId }) {
                 className="message-avatar"
               />
             ) : (
-              <div className="message-avatar">
-                {message.senderName?.charAt(0).toUpperCase() || '?'}
-              </div>
+              <div className="message-avatar">{message.senderName?.charAt(0).toUpperCase() || '?'}</div>
             )}
             <div className="message-content">
               {!isOwn && <div className="message-sender">{message.senderName}</div>}
@@ -111,21 +118,4 @@ function MessageList({ messages, currentUserId }) {
   );
 }
 
-function ChatRoom({ messages, currentUser, onSendMessage, onSendVoice, onTyping }) {
-  const { t } = useLanguage();
-
-  return (
-    <>
-      <MessageList messages={messages} currentUserId={currentUser?.id} />
-      <div className="message-input-container">
-        <VoiceRecorder onSendVoice={onSendVoice} />
-        <MessageInput
-          onSendMessage={onSendMessage}
-          onTyping={onTyping}
-        />
-      </div>
-    </>
-  );
-}
-
-export default ChatRoom;
+export default MessageList;

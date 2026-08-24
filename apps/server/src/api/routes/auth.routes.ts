@@ -105,7 +105,7 @@ router.get(
         id: user.id,
         username: user.username,
         avatar: user.avatar,
-        created_at: user.createdAt,
+        createdAt: user.createdAt,
       },
     });
   }),

@@ -1,20 +1,27 @@
-import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
 
 const isAndroid = typeof window !== 'undefined' && window.Capacitor !== undefined;
 
-function BottomNav({ activeTab, onTabChange }) {
-  const { t, language, setLanguage, languages, languageNames } = useLanguage();
+export type MobileTab = 'public' | 'private' | 'groups' | 'settings';
+
+function BottomNav({
+  activeTab,
+  onTabChange,
+}: {
+  activeTab: string;
+  onTabChange: (tab: MobileTab) => void;
+}) {
+  const { t } = useLanguage();
 
   if (!isAndroid) {
     return null;
   }
 
-  const tabs = [
+  const tabs: Array<{ id: MobileTab; icon: string; label: string }> = [
     { id: 'public', icon: '💬', label: t('publicChat') },
     { id: 'private', icon: '👤', label: t('privateChat') },
     { id: 'groups', icon: '👥', label: t('myGroups') },
-    { id: 'settings', icon: '⚙️', label: t('settings') }
+    { id: 'settings', icon: '⚙️', label: t('settings') },
   ];
 
   return (

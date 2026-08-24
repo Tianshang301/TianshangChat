@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { useAuth, getServerUrl } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
 const isAndroid = typeof window !== 'undefined' && window.Capacitor !== undefined;
 const PORT = 3000;
 
-function RegisterForm({ onSwitchToLogin }) {
+function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
   const { register, error, clearError, serverIp, setServerIp, updateServerUrl } = useAuth();
   const { t, language, setLanguage, languages, languageNames } = useLanguage();
   const [username, setUsername] = useState('');
@@ -16,7 +16,7 @@ function RegisterForm({ onSwitchToLogin }) {
   const [registerSuccess, setRegisterSuccess] = useState(false);
   const [localServerIp, setLocalServerIp] = useState(serverIp);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
     setLocalError('');
@@ -37,21 +37,20 @@ function RegisterForm({ onSwitchToLogin }) {
     }
 
     if (isAndroid && localServerIp) {
-      const newUrl = `http://${localServerIp}:${PORT}`;
-      updateServerUrl(newUrl);
+      updateServerUrl(`http://${localServerIp}:${PORT}`);
       setServerIp(localServerIp);
     }
 
     setLoading(true);
     const result = await register(username, password);
     setLoading(false);
-    
+
     if (result.success) {
       setRegisterSuccess(true);
       setLocalError('');
     } else {
       setRegisterSuccess(false);
-      setLocalError(result.error || t('registerFailed'));
+      setLocalError(result.error ?? t('registerFailed'));
     }
   };
 
@@ -131,7 +130,7 @@ function RegisterForm({ onSwitchToLogin }) {
           <button
             key={lang}
             className={`lang-btn-welcome ${language === lang ? 'active' : ''}`}
-            onClick={() => setLanguage(lang)}
+            onClick={() => setLanguage(lang as typeof language)}
           >
             {languageNames[lang]}
           </button>

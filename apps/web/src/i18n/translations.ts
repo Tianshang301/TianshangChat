@@ -1,4 +1,4 @@
-export const translations = {
+export const translations: Record<string, Record<string, string>> = {
   en: {
     appName: 'TianshangChat',
     joinChat: 'Join Chat',
@@ -396,7 +396,7 @@ export const translations = {
   }
 };
 
-export const languageNames = {
+export const languageNames: Record<string, string> = {
   en: 'EN',
   zh: '中',
   ja: '日',

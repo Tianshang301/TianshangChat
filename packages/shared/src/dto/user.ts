@@ -30,7 +30,7 @@ export const SearchUsersResponseSchema = z.object({
       id: z.number().int(),
       username: z.string(),
       avatar: z.string().nullable(),
-      created_at: z.string().optional(),
+      createdAt: z.string().optional(),
     }),
   ),
 });

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { useAuth, getServerUrl } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 
 const isAndroid = typeof window !== 'undefined' && window.Capacitor !== undefined;
 const PORT = 3000;
 
-function LoginForm({ onSwitchToRegister }) {
+function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
   const { login, error, clearError, serverIp, setServerIp, updateServerUrl } = useAuth();
   const { t, language, setLanguage, languages, languageNames } = useLanguage();
   const [username, setUsername] = useState('');
@@ -14,12 +14,11 @@ function LoginForm({ onSwitchToRegister }) {
   const [loading, setLoading] = useState(false);
   const [localServerIp, setLocalServerIp] = useState(serverIp);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
     if (isAndroid && localServerIp) {
-      const newUrl = `http://${localServerIp}:${PORT}`;
-      updateServerUrl(newUrl);
+      updateServerUrl(`http://${localServerIp}:${PORT}`);
       setServerIp(localServerIp);
     }
     setLoading(true);
@@ -90,7 +89,7 @@ function LoginForm({ onSwitchToRegister }) {
           <button
             key={lang}
             className={`lang-btn-welcome ${language === lang ? 'active' : ''}`}
-            onClick={() => setLanguage(lang)}
+            onClick={() => setLanguage(lang as typeof language)}
           >
             {languageNames[lang]}
           </button>

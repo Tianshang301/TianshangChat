@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 
-function MessageInput({ onSendMessage, onTyping }) {
+function MessageInput({
+  onSendMessage,
+  onTyping,
+}: {
+  onSendMessage: (content: string) => void;
+  onTyping?: () => void;
+}) {
   const { t } = useLanguage();
   const [message, setMessage] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim()) {
       onSendMessage(message);
@@ -14,19 +20,19 @@ function MessageInput({ onSendMessage, onTyping }) {
     }
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
-    onTyping();
+    onTyping?.();
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      handleSubmit(e as unknown as React.FormEvent);
     }
   };
 
-  const addEmoji = (emoji) => {
+  const addEmoji = (emoji: string) => {
     setMessage((prev) => prev + emoji);
     setShowEmoji(false);
   };
@@ -44,16 +50,13 @@ function MessageInput({ onSendMessage, onTyping }) {
         </button>
         {showEmoji && (
           <div className="emoji-picker">
-            {['😀', '😂', '🥰', '😍', '😎', '🤔', '👍', '👎', '❤️', '🎉', '🔥', '💯', '👏', '🙏', '😱', '🤝'].map((emoji, i) => (
-              <button
-                key={i}
-                type="button"
-                className="emoji-btn"
-                onClick={() => addEmoji(emoji)}
-              >
-                {emoji}
-              </button>
-            ))}
+            {['😀', '😂', '🥰', '😍', '😎', '🤔', '👍', '👎', '❤️', '🎉', '🔥', '💯', '👏', '🙏', '😱', '🤝'].map(
+              (emoji, i) => (
+                <button key={i} type="button" className="emoji-btn" onClick={() => addEmoji(emoji)}>
+                  {emoji}
+                </button>
+              ),
+            )}
           </div>
         )}
       </div>
@@ -66,11 +69,7 @@ function MessageInput({ onSendMessage, onTyping }) {
         onKeyPress={handleKeyPress}
         maxLength={1000}
       />
-      <button
-        type="submit"
-        className="send-btn"
-        disabled={!message.trim()}
-      >
+      <button type="submit" className="send-btn" disabled={!message.trim()}>
         {t('send')}
       </button>
     </form>

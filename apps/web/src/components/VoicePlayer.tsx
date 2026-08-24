@@ -1,13 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-function VoicePlayer({ audioUrl, duration: propDuration }) {
+function VoicePlayer({
+  audioUrl,
+  duration: propDuration,
+}: {
+  audioUrl: string;
+  duration?: string | number | null;
+}) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
-  const audioRef = useRef(null);
-  const progressRef = useRef(null);
-  const animRef = useRef(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const progressRef = useRef<HTMLDivElement | null>(null);
+  const animRef = useRef<number | null>(null);
 
   useEffect(() => {
     const audio = new Audio(audioUrl);
@@ -36,33 +42,33 @@ function VoicePlayer({ audioUrl, duration: propDuration }) {
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
       audio.src = '';
-      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (animRef.current !== null) cancelAnimationFrame(animRef.current);
     };
   }, [audioUrl]);
 
-  const updateProgress = () => {
+  const updateProgress = (): void => {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
       animRef.current = requestAnimationFrame(updateProgress);
     }
   };
 
-  const togglePlay = () => {
+  const togglePlay = (): void => {
     const audio = audioRef.current;
     if (!audio) return;
 
     if (isPlaying) {
       audio.pause();
-      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (animRef.current !== null) cancelAnimationFrame(animRef.current);
       setIsPlaying(false);
     } else {
-      audio.play().catch(() => {});
+      void audio.play().catch(() => {});
       animRef.current = requestAnimationFrame(updateProgress);
       setIsPlaying(true);
     }
   };
 
-  const handleSeek = (e) => {
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>): void => {
     const audio = audioRef.current;
     if (!audio || !progressRef.current || !duration) return;
 
@@ -72,7 +78,7 @@ function VoicePlayer({ audioUrl, duration: propDuration }) {
     setCurrentTime(audio.currentTime);
 
     if (!isPlaying) {
-      audio.play().catch(() => {});
+      void audio.play().catch(() => {});
       animRef.current = requestAnimationFrame(updateProgress);
       setIsPlaying(true);
     }
@@ -80,7 +86,7 @@ function VoicePlayer({ audioUrl, duration: propDuration }) {
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  const formatTime = (s) => {
+  const formatTime = (s: number | null): string => {
     if (s == null || isNaN(s)) return '0:00';
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
@@ -96,17 +102,13 @@ function VoicePlayer({ audioUrl, duration: propDuration }) {
       >
         {isPlaying ? '\u23F8' : '\u25B6'}
       </button>
-      <div
-        className="voice-progress"
-        ref={progressRef}
-        onClick={handleSeek}
-      >
+      <div className="voice-progress" ref={progressRef} onClick={handleSeek}>
         <div className="voice-progress-fill" style={{ width: `${progressPercent}%` }} />
       </div>
       <span className="voice-time">
         {isLoaded ? formatTime(currentTime) : '0:00'}
         &nbsp;/&nbsp;
-        {isLoaded ? formatTime(duration) : (propDuration || '0:00')}
+        {isLoaded ? formatTime(duration) : (propDuration ?? '0:00')}
       </span>
     </div>
   );

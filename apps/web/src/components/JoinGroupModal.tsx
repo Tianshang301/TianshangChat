@@ -1,8 +1,15 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import type { GroupDetail } from '@tianshangchat/shared';
 
-function JoinGroupModal({ onClose, onJoinSuccess }) {
+function JoinGroupModal({
+  onClose,
+  onJoinSuccess,
+}: {
+  onClose: () => void;
+  onJoinSuccess?: (group: GroupDetail) => void;
+}) {
   const { t } = useLanguage();
   const { token, serverUrl } = useAuth();
   const [groupId, setGroupId] = useState('');
@@ -16,29 +23,37 @@ function JoinGroupModal({ onClose, onJoinSuccess }) {
       setError('Invalid group ID');
       return;
     }
-    
+
     setLoading(true);
     setError('');
     setSuccess('');
-    
+
     try {
       const response = await fetch(`${serverUrl}/api/groups/${id}/join`, {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
-      const data = await response.json();
-      
-      if (data.success) {
+      const data: unknown = await response.json();
+
+      const d = asRecord(data);
+      if (d?.['success'] === true) {
         setSuccess(t('joinSuccess') || 'Joined successfully!');
         if (onJoinSuccess) {
-          onJoinSuccess(data.group);
+          onJoinSuccess(d['group'] as GroupDetail);
         }
         setTimeout(() => onClose(), 1500);
       } else {
-        setError(data.error || 'Failed to join group');
+        const msg =
+          typeof data === 'object' &&
+          data !== null &&
+          'error' in data &&
+          typeof (data as { error: unknown }).error === 'string'
+            ? (data as { error: string }).error
+            : 'Failed to join group';
+        setError(msg);
       }
     } catch (err) {
       console.error('Join group error:', err);
@@ -48,15 +63,15 @@ function JoinGroupModal({ onClose, onJoinSuccess }) {
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleJoin();
+      void handleJoin();
     }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content mobile-modal" onClick={e => e.stopPropagation()}>
+      <div className="modal-content mobile-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{t('joinGroup')}</h3>
           <button className="close-btn" onClick={onClose}>×</button>
@@ -75,13 +90,13 @@ function JoinGroupModal({ onClose, onJoinSuccess }) {
               min="1"
             />
           </div>
-          
+
           {error && <div className="search-error">{error}</div>}
           {success && <div className="search-success">{success}</div>}
-          
+
           <div className="modal-footer">
             <button className="cancel-btn" onClick={onClose}>{t('cancel')}</button>
-            <button className="confirm-btn" onClick={handleJoin} disabled={loading || !groupId}>
+            <button className="confirm-btn" onClick={() => void handleJoin()} disabled={loading || !groupId}>
               {loading ? '...' : t('joinGroup')}
             </button>
           </div>
@@ -89,6 +104,10 @@ function JoinGroupModal({ onClose, onJoinSuccess }) {
       </div>
     </div>
   );
+}
+
+function asRecord(obj: unknown): Record<string, unknown> | null {
+  return typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : null;
 }
 
 export default JoinGroupModal;

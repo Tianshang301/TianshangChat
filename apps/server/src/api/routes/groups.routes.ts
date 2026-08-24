@@ -13,46 +13,12 @@ import * as messageRepo from '../../data/message.repo.js';
 
 const router = Router();
 
-/** Shape-compatible with legacy `Group.findById` output (snake_case base columns). */
-function toWireGroupDetail(g: groupRepo.GroupDetailRecord): Record<string, unknown> {
-  return {
-    id: g.id,
-    name: g.name,
-    creator_id: g.creatorId,
-    max_members: g.maxMembers,
-    created_at: g.createdAt,
-    creator_name: g.creatorName,
-    members: g.members.map((m) => ({
-      id: m.id,
-      group_id: m.groupId,
-      user_id: m.userId,
-      role: m.role,
-      joined_at: m.joinedAt,
-      username: m.username,
-      avatar: m.avatar,
-    })),
-  };
-}
-
-function toWireGroupSummary(g: groupRepo.GroupSummaryRecord): Record<string, unknown> {
-  return {
-    id: g.id,
-    name: g.name,
-    creator_id: g.creatorId,
-    max_members: g.maxMembers,
-    created_at: g.createdAt,
-    creator_name: g.creatorName,
-    role: g.role,
-    member_count: g.memberCount,
-  };
-}
-
 router.get(
   '/',
   authMiddleware,
   handler(async (req, res) => {
     const groups = groupRepo.getUserGroups(req.user!.id);
-    res.json({ success: true, groups: groups.map(toWireGroupSummary) });
+    res.json({ success: true, groups });
   }),
 );
 
@@ -62,7 +28,7 @@ router.post(
   handler(async (req, res) => {
     const { name, memberIds } = parseBody(CreateGroupRequestSchema, req.body);
     const group = groupRepo.createGroup(name, req.user!.id, memberIds);
-    res.status(201).json({ success: true, group: toWireGroupDetail(group) });
+    res.status(201).json({ success: true, group });
   }),
 );
 
@@ -80,7 +46,7 @@ router.get(
       res.status(403).json(protocolError('Not a member of this group', ErrorCode.NotMember));
       return;
     }
-    res.json({ success: true, group: toWireGroupDetail(group) });
+    res.json({ success: true, group });
   }),
 );
 
@@ -106,7 +72,7 @@ router.put(
       groupRepo.updateGroupName(groupId, name);
     }
 
-    res.json({ success: true, group: toWireGroupDetail(groupRepo.findGroupById(groupId)!) });
+    res.json({ success: true, group: groupRepo.findGroupById(groupId) });
   }),
 );
 
@@ -207,7 +173,7 @@ router.post(
 
     groupRepo.addMember(groupId, userId);
 
-    res.json({ success: true, group: toWireGroupDetail(groupRepo.findGroupById(groupId)!) });
+    res.json({ success: true, group: groupRepo.findGroupById(groupId) });
   }),
 );
 
@@ -245,7 +211,7 @@ router.delete(
       return;
     }
 
-    res.json({ success: true, group: toWireGroupDetail(groupRepo.findGroupById(groupId)!) });
+    res.json({ success: true, group: groupRepo.findGroupById(groupId) });
   }),
 );
 
@@ -275,7 +241,7 @@ router.put(
 
     groupRepo.setAdminRole(groupId, targetUserId, isAdmin);
 
-    res.json({ success: true, group: toWireGroupDetail(groupRepo.findGroupById(groupId)!) });
+    res.json({ success: true, group: groupRepo.findGroupById(groupId) });
   }),
 );
 
@@ -308,7 +274,7 @@ router.post(
 
     groupRepo.transferOwnership(groupId, newOwnerId);
 
-    res.json({ success: true, group: toWireGroupDetail(groupRepo.findGroupById(groupId)!) });
+    res.json({ success: true, group: groupRepo.findGroupById(groupId) });
   }),
 );
 
@@ -336,7 +302,7 @@ router.post(
 
     groupRepo.addMember(groupId, req.user!.id);
 
-    res.json({ success: true, group: toWireGroupDetail(groupRepo.findGroupById(groupId)!) });
+    res.json({ success: true, group: groupRepo.findGroupById(groupId) });
   }),
 );
 

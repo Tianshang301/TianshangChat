@@ -1,15 +1,40 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { SERVER_URL, API_URL } from '../config';
+import { SERVER_URL } from '../config';
 import VoicePlayer from './VoicePlayer';
+import type { MessageDTO } from '@tianshangchat/shared';
 
-function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSendVoice, onTyping, onClose, typingUser }) {
+interface ChatPartner {
+  id: number;
+  username: string;
+  avatar: string | null;
+}
+
+function PrivateChatPanel({
+  user,
+  messages,
+  currentUserId,
+  onSendMessage,
+  onSendVoice,
+  onTyping,
+  onClose,
+  typingUser,
+}: {
+  user: ChatPartner;
+  messages: MessageDTO[];
+  currentUserId?: number | null;
+  onSendMessage: (content: string) => void;
+  onSendVoice: (url: string, duration: string) => void;
+  onTyping: () => void;
+  onClose: () => void;
+  typingUser?: string | null;
+}) {
   const { t } = useLanguage();
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const listRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -17,7 +42,7 @@ function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSend
     }
   }, [messages]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim()) {
       onSendMessage(message);
@@ -25,40 +50,39 @@ function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSend
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      handleSubmit(e as unknown as React.FormEvent);
     }
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
     onTyping();
   };
 
-  const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const formatTime = (timestamp: string): string =>
+    new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
-      mediaRecorderRef.current.ondataavailable = (e) => {
+      recorder.ondataavailable = (e: BlobEvent) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      mediaRecorderRef.current.onstop = async () => {
+      recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         await uploadAudio(blob);
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       };
 
-      mediaRecorderRef.current.start();
+      recorder.start();
       setIsRecording(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -66,25 +90,30 @@ function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSend
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
   };
 
-  const uploadAudio = async (blob) => {
+  const uploadAudio = async (blob: Blob) => {
     const formData = new FormData();
     formData.append('voice', blob, 'voice.webm');
     try {
-      const response = await fetch(`${API_URL}/upload/voice`, {
+      const response = await fetch(`${SERVER_URL}/api/upload/voice`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: formData
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: formData,
       });
-      const data = await response.json();
-      if (data.success) {
+      const data: unknown = await response.json();
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        'success' in data &&
+        (data as { success: boolean }).success &&
+        'url' in data &&
+        typeof (data as { url: unknown }).url === 'string'
+      ) {
         const duration = Math.round(blob.size / 10000);
-        onSendVoice(data.url, `${duration}s`);
+        onSendVoice((data as { url: string }).url, `${duration}s`);
       }
     } catch (error) {
       console.error('Upload failed:', error);
@@ -107,16 +136,13 @@ function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSend
 
       <div className="private-messages" ref={listRef}>
         {messages.map((msg) => (
-          <div 
-            key={msg.id} 
+          <div
+            key={msg.id}
             className={`private-message ${msg.senderId === currentUserId ? 'sent' : 'received'}`}
           >
             <div className="message-bubble">
               {msg.type === 'voice' ? (
-                <VoicePlayer
-                  audioUrl={`${SERVER_URL}${msg.audioUrl}`}
-                  duration={msg.duration}
-                />
+                <VoicePlayer audioUrl={`${SERVER_URL}${msg.audioUrl ?? ''}`} duration={msg.duration} />
               ) : (
                 <div className="message-text">{msg.content}</div>
               )}
@@ -126,13 +152,17 @@ function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSend
         ))}
       </div>
 
-      {typingUser && <div className="typing-indicator">{typingUser} {t('typing')}</div>}
+      {typingUser && (
+        <div className="typing-indicator">
+          {typingUser} {t('typing')}
+        </div>
+      )}
 
       <form className="private-input-form" onSubmit={handleSubmit}>
         <button
           type="button"
           className={`icon-btn ${isRecording ? 'recording' : ''}`}
-          onClick={isRecording ? stopRecording : startRecording}
+          onClick={isRecording ? stopRecording : () => void startRecording()}
         >
           {isRecording ? '⏹' : '🎤'}
         </button>

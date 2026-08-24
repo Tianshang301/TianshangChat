@@ -1,25 +1,33 @@
-import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { SERVER_URL } from '../config';
+import type { OnlineUser } from '@tianshangchat/shared';
 
-function UserList({ users, currentUser, onUserClick, unreadCounts }) {
+function UserList({
+  users,
+  currentUser,
+  onUserClick,
+  unreadCounts,
+}: {
+  users: OnlineUser[];
+  currentUser?: { id: number } | null;
+  onUserClick: (user: OnlineUser) => void;
+  unreadCounts?: Record<number, number>;
+}) {
   const { t } = useLanguage();
-  const otherUsers = users.filter(u => u.id !== currentUser?.id);
+  const otherUsers = users.filter((u) => u.id !== currentUser?.id);
 
   return (
     <div className="user-list-section">
       <div className="section-header">
-        <span>{t('onlineUsers')} ({otherUsers.length})</span>
+        <span>
+          {t('onlineUsers')} ({otherUsers.length})
+        </span>
       </div>
       {otherUsers.length === 0 ? (
         <div className="empty-list">{t('noOnlineUsers')}</div>
       ) : (
         otherUsers.map((user) => (
-          <div 
-            key={user.id} 
-            className="user-item clickable"
-            onClick={() => onUserClick(user)}
-          >
+          <div key={user.id} className="user-item clickable" onClick={() => onUserClick(user)}>
             <span className="online-indicator"></span>
             {user.avatar ? (
               <img
@@ -34,8 +42,8 @@ function UserList({ users, currentUser, onUserClick, unreadCounts }) {
               </div>
             )}
             <span className="user-name">{user.username}</span>
-            {unreadCounts?.[user.id] > 0 && (
-              <span className="unread-badge">{unreadCounts[user.id]}</span>
+            {(unreadCounts?.[user.id] ?? 0) > 0 && (
+              <span className="unread-badge">{unreadCounts?.[user.id]}</span>
             )}
           </div>
         ))

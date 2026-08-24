@@ -1,37 +1,38 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config';
 
-function VoiceRecorder({ onSendVoice }) {
+function VoiceRecorder({ onSendVoice }: { onSendVoice: (url: string, duration: string) => void }) {
   const { t } = useLanguage();
   const { token } = useAuth();
   const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream, {
-        mimeType: 'audio/webm'
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm',
       });
+      mediaRecorderRef.current = recorder;
 
       chunksRef.current = [];
 
-      mediaRecorderRef.current.ondataavailable = (e) => {
+      recorder.ondataavailable = (e: BlobEvent) => {
         if (e.data.size > 0) {
           chunksRef.current.push(e.data);
         }
       };
 
-      mediaRecorderRef.current.onstop = async () => {
+      recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         await uploadAudio(blob);
         stream.getTracks().forEach((track) => track.stop());
       };
 
-      mediaRecorderRef.current.start();
+      recorder.start();
       setIsRecording(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -46,7 +47,7 @@ function VoiceRecorder({ onSendVoice }) {
     }
   };
 
-  const uploadAudio = async (blob) => {
+  const uploadAudio = async (blob: Blob) => {
     const formData = new FormData();
     formData.append('voice', blob, 'voice.webm');
 
@@ -54,14 +55,21 @@ function VoiceRecorder({ onSendVoice }) {
       const response = await fetch(`${API_URL}/upload/voice`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: formData
+        body: formData,
       });
-      const data = await response.json();
-      if (data.success && data.url) {
+      const data: unknown = await response.json();
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        'success' in data &&
+        (data as { success: boolean }).success &&
+        'url' in data &&
+        typeof (data as { url: unknown }).url === 'string'
+      ) {
         const duration = Math.round(blob.size / 10000);
-        onSendVoice(data.url, `${duration}s`);
+        onSendVoice((data as { url: string }).url, `${duration}s`);
       }
     } catch (error) {
       console.error('Upload failed:', error);
@@ -71,7 +79,7 @@ function VoiceRecorder({ onSendVoice }) {
   return (
     <button
       className={`icon-btn ${isRecording ? 'recording' : ''}`}
-      onClick={isRecording ? stopRecording : startRecording}
+      onClick={isRecording ? stopRecording : () => void startRecording()}
       title={isRecording ? 'Stop Recording' : t('voiceMessage')}
     >
       {isRecording ? '⏹' : '🎤'}
