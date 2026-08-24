@@ -131,17 +131,18 @@ docker compose up -d         # 一键部署 server + Caddy TLS + coturn
 > 进度勾选表即当前状态。开工一个条目前先把它勾成 `[x]` 所在项的上下文读完。
 
 ### Phase 0 · 工程基线（≈4 天）
-- [ ] pnpm workspace + Turborepo；backend/frontend/electron 迁入 `apps/`
-- [ ] ESLint(typescript-eslint) + Prettier + strict tsconfig 骨架
-- [ ] 目录骨架（apps/packages）与依赖规则约束落地
-- **DoD**：旧功能在 monorepo 下照常启动
+- [x] pnpm workspace + Turborepo；backend/frontend/electron 迁入 `apps/`
+- [x] ESLint(typescript-eslint) + Prettier + strict tsconfig 骨架
+- [x] 目录骨架（apps/packages）与依赖规则约束落地
+- **DoD**：旧功能在 monorepo 下照常启动 ✅（2026-08-24，commit 0dd304b）
 
 ### Phase 1 · TypeScript 全栈 + 共享协议层（≈2 周）
-- [ ] `packages/shared`：`ClientToServerEvents` / `ServerToClientEvents`、Zod DTO、错误码
-- [ ] 后端 TS 化；`server.js`(551行) 拆为 `socket/handlers/{auth,message,group,presence}.ts`
-- [ ] Drizzle schema 接管 `schema.sql`，含迁移脚本与既有库兼容
-- [ ] 前端渐进 `.tsx`：context/utils 先行 → 20 个组件随后
-- **DoD**：`pnpm typecheck` 全绿；socket 收发全编译期校验；API 入口 100% Zod
+- [x] `packages/shared`：`ClientToServerEvents` / `ServerToClientEvents`、Zod DTO、错误码
+- [x] 后端 TS 化；`server.js`(551行) 拆为 `socket/handlers/{auth,message,group,presence}.ts`
+- [x] Drizzle schema 接管 `schema.sql`，含迁移脚本与既有库兼容
+- [x] 前端 `.tsx` 转换（context/utils 与组件一次性全量完成，超出渐进计划）
+- **DoD**：`pnpm typecheck` 全绿 ✅；socket 收发全编译期校验 ✅；API 入口 100% Zod ✅（2026-08-24）
+- 备注：群组/用户 REST 响应由 snake_case 统一为 camelCase（与 shared DTO 对齐），重构前的旧客户端需更新后兼容
 
 ### Phase 2 · 分层架构 + 离线优先（≈2 周）
 - [ ] `App.jsx`(741行)/ChatRoom 拆解至 domain/data/ui/state
