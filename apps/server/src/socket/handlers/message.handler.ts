@@ -5,7 +5,7 @@ import {
   protocolError,
   validateUploadPath,
 } from '@tianshangchat/shared';
-import { createMessage } from '../../data/message.repo.js';
+import { createMessage, markDelivered } from '../../data/message.repo.js';
 import { presence, type ChatSocket } from './presence.js';
 import { safeHandler } from './safe.js';
 
@@ -23,6 +23,15 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/** Ack helper: responds with the persisted id when the client passed a callback. */
+function ackSend(ack: ((res: { id: number }) => void) | undefined, id: number): void {
+  try {
+    ack?.({ id });
+  } catch {
+    /* client gone before ack — nothing to do */
+  }
+}
+
 export function registerMessageHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
   socket: ChatSocket,
@@ -30,7 +39,7 @@ export function registerMessageHandlers(
   // ---------------- public ----------------
   socket.on(
     'send-message',
-    safeHandler((data) => {
+    safeHandler((data, ack) => {
       const user = requireUser(socket);
       if (!user) return;
 
@@ -51,12 +60,14 @@ export function registerMessageHandlers(
         type: 'text',
         timestamp: nowIso(),
       });
+
+      ackSend(ack, message.id);
     }),
   );
 
   socket.on(
     'send-voice',
-    safeHandler((data) => {
+    safeHandler((data, ack) => {
       const user = requireUser(socket);
       if (!user) return;
 
@@ -84,13 +95,15 @@ export function registerMessageHandlers(
         type: 'voice',
         timestamp: nowIso(),
       });
+
+      ackSend(ack, message.id);
     }),
   );
 
   // ---------------- private ----------------
   socket.on(
     'send-private-message',
-    safeHandler((data) => {
+    safeHandler((data, ack) => {
       const user = requireUser(socket);
       if (!user) return;
 
@@ -122,13 +135,23 @@ export function registerMessageHandlers(
       socket.emit('receive-private-message', payload);
 
       const recipientSocket = presence.getSocketByUserId(recipientId);
-      recipientSocket?.emit('receive-private-message', payload);
+      let deliveredNow = false;
+      if (recipientSocket) {
+        recipientSocket.emit('receive-private-message', payload);
+        markDelivered([message.id], recipientId, null);
+        deliveredNow = true;
+      }
+      if (deliveredNow) {
+        socket.emit('message-status', { statuses: [{ id: message.id, status: 'delivered' }] });
+      }
+
+      ackSend(ack, message.id);
     }),
   );
 
   socket.on(
     'send-private-voice',
-    safeHandler((data) => {
+    safeHandler((data, ack) => {
       const user = requireUser(socket);
       if (!user) return;
 
@@ -167,7 +190,17 @@ export function registerMessageHandlers(
       socket.emit('receive-private-message', payload);
 
       const recipientSocket = presence.getSocketByUserId(recipientId);
-      recipientSocket?.emit('receive-private-message', payload);
+      let deliveredNow = false;
+      if (recipientSocket) {
+        recipientSocket.emit('receive-private-message', payload);
+        markDelivered([message.id], recipientId, null);
+        deliveredNow = true;
+      }
+      if (deliveredNow) {
+        socket.emit('message-status', { statuses: [{ id: message.id, status: 'delivered' }] });
+      }
+
+      ackSend(ack, message.id);
     }),
   );
 
@@ -198,4 +231,5 @@ export function registerMessageHandlers(
       });
     }),
   );
+
 }

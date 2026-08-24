@@ -8,6 +8,7 @@ import { registerAuthHandler } from './handlers/auth.handler.js';
 import { registerMessageHandlers } from './handlers/message.handler.js';
 import { registerGroupHandlers } from './handlers/group.handler.js';
 import { registerPresenceHandlers } from './handlers/presence.handler.js';
+import { registerReceiptHandlers } from './handlers/receipt.handler.js';
 
 export type ChatServer = SocketIoServer<ClientToServerEvents, ServerToClientEvents>;
 
@@ -31,6 +32,7 @@ export function createChatServer(
     registerMessageHandlers(io, socket);
     registerGroupHandlers(io, socket);
     registerPresenceHandlers(io, socket);
+    registerReceiptHandlers(io, socket);
   });
 
   return io;

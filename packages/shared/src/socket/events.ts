@@ -11,6 +11,11 @@ export interface AuthenticatePayload {
   token: string;
 }
 
+/** Ack payload returned by send events once the server has persisted the message. */
+export interface SendAck {
+  id: number;
+}
+
 export interface AuthenticatedPayload {
   user: OnlineUser;
 }
@@ -79,39 +84,83 @@ export type CreateGroupSocketPayload = {
 };
 
 /* ------------------------------------------------------------------ */
+/* Delivery / read receipts                                            */
+/* ------------------------------------------------------------------ */
+
+export type MessageDeliveryStatus = 'delivered' | 'read';
+
+export interface MessageStatusEntry {
+  id: number;
+  status: MessageDeliveryStatus;
+}
+
+/** Client confirms the OS/user actually received (displayed) these messages. */
+export interface MarkDeliveredPayload {
+  messageIds: number[];
+}
+
+/** Client confirms the user has seen a conversation. */
+export type MarkReadPayload =
+  | { kind: 'private'; peerId: number; messageIds: number[] }
+  | { kind: 'group'; groupId: number; messageIds: number[] };
+
+/** Pushed to the original sender whenever statuses change. */
+export interface MessageStatusPayload {
+  statuses: MessageStatusEntry[];
+}
+
+/* ------------------------------------------------------------------ */
 /* Contracts                                                           */
 /* ------------------------------------------------------------------ */
 
-/** Events emitted by clients, handled by `apps/server`. */
+/**
+ * Events emitted by clients, handled by `apps/server`.
+ * Send-style events accept an optional ack callback carrying `SendAck`
+ * so clients can confirm persistence before flipping local status to `sent`.
+ */
 export interface ClientToServerEvents {
   authenticate: (payload: AuthenticatePayload) => void;
 
   // public channel
-  'send-message': (payload: { content: string }) => void;
-  'send-voice': (payload: { audioUrl: string; duration?: string | number }) => void;
+  'send-message': (
+    payload: { content: string },
+    ack?: (res: SendAck) => void,
+  ) => void;
+  'send-voice': (
+    payload: { audioUrl: string; duration?: string | number },
+    ack?: (res: SendAck) => void,
+  ) => void;
   typing: () => void;
   'stop-typing': () => void;
 
   // private channel
-  'send-private-message': (payload: { recipientId: number; content: string }) => void;
-  'send-private-voice': (payload: {
-    recipientId: number;
-    audioUrl: string;
-    duration?: string | number;
-  }) => void;
+  'send-private-message': (
+    payload: { recipientId: number; content: string },
+    ack?: (res: SendAck) => void,
+  ) => void;
+  'send-private-voice': (
+    payload: { recipientId: number; audioUrl: string; duration?: string | number },
+    ack?: (res: SendAck) => void,
+  ) => void;
   'private-typing': (payload: { recipientId: number }) => void;
   'stop-private-typing': (payload: { recipientId: number }) => void;
 
   // group channel
-  'send-group-message': (payload: { groupId: number; content: string }) => void;
-  'send-group-voice': (payload: {
-    groupId: number;
-    audioUrl: string;
-    duration?: string | number;
-  }) => void;
+  'send-group-message': (
+    payload: { groupId: number; content: string },
+    ack?: (res: SendAck) => void,
+  ) => void;
+  'send-group-voice': (
+    payload: { groupId: number; audioUrl: string; duration?: string | number },
+    ack?: (res: SendAck) => void,
+  ) => void;
   'create-group': (payload: CreateGroupSocketPayload) => void;
   'join-group': (payload: { groupId: number }) => void;
   'leave-group': (payload: { groupId: number }) => void;
+
+  // receipts
+  'mark-delivered': (payload: MarkDeliveredPayload) => void;
+  'mark-read': (payload: MarkReadPayload) => void;
 
   // profile
   'update-avatar': (avatarUrl: string) => void;
@@ -134,6 +183,9 @@ export interface ServerToClientEvents {
   'receive-message': (message: MessageDTO) => void;
   'receive-private-message': (payload: PrivateMessagePayload) => void;
   'receive-group-message': (payload: GroupMessagePayload) => void;
+
+  /** Status transitions for messages authored by this client. */
+  'message-status': (payload: MessageStatusPayload) => void;
 
   'private-typing-start': (payload: PrivateTypingStartPayload) => void;
   'private-typing-stop': (payload: PrivateTypingStopPayload) => void;
