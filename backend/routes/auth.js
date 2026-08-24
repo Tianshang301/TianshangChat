@@ -83,6 +83,10 @@ router.post('/login',
       expiresAt.setHours(expiresAt.getHours() + (remember ? 24 * 7 : 24));
 
       db.prepare(`
+        DELETE FROM sessions WHERE user_id = ?
+      `).run(user.id);
+
+      db.prepare(`
         INSERT INTO sessions (user_id, token, expires_at, remember_me)
         VALUES (?, ?, ?, ?)
       `).run(user.id, token, expiresAt.toISOString(), remember ? 1 : 0);

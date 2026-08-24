@@ -1,13 +1,13 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, session } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+const isDev = !app.isPackaged;
 
 app.commandLine.appendSwitch('no-proxy-server');
-app.commandLine.appendSwitch('disable-web-security');
 
 function createWindow() {
   console.log('Creating main window...');
@@ -23,8 +23,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
-      allowRunningInsecureContent: true
+      webSecurity: true,
+      allowRunningInsecureContent: false
     }
   });
 

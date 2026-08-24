@@ -1,9 +1,5 @@
-import CryptoJS from 'crypto-js';
-
-const SECRET_KEY = 'TianshangChatCrypto2024';
-
 export function encryptPassword(password) {
-  return CryptoJS.SHA256(password + SECRET_KEY).toString();
+  return password;
 }
 
 export function validatePassword(password) {

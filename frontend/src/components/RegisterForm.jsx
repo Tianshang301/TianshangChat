@@ -13,6 +13,7 @@ function RegisterForm({ onSwitchToLogin }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [registerSuccess, setRegisterSuccess] = useState(false);
   const [localServerIp, setLocalServerIp] = useState(serverIp);
 
   const handleSubmit = async (e) => {
@@ -45,52 +46,68 @@ function RegisterForm({ onSwitchToLogin }) {
     const result = await register(username, password);
     setLoading(false);
     
-    if (!result.success && !error) {
-      setLocalError(result.error);
+    if (result.success) {
+      setRegisterSuccess(true);
+      setLocalError('');
+    } else {
+      setRegisterSuccess(false);
+      setLocalError(result.error || t('registerFailed'));
     }
   };
 
   return (
     <div className="auth-form">
       <h2>{t('register')}</h2>
-      {(error || localError) && <div className="auth-error">{error || localError}</div>}
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <input
-            type="text"
-            className="auth-input"
-            placeholder={t('username')}
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-            autoFocus
-          />
+      {registerSuccess ? (
+        <div className="auth-success">
+          <span className="auth-success-icon">✓</span>
+          <span>{t('registerSuccess')}</span>
+          <button className="switch-btn" style={{ marginTop: '10px' }} onClick={onSwitchToLogin}>
+            {t('login')}
+          </button>
         </div>
-        <div className="form-group">
-          <input
-            type="password"
-            className="auth-input"
-            placeholder={t('password')}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <input
-            type="password"
-            className="auth-input"
-            placeholder={t('confirmPassword')}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
-        </div>
-        <div className="password-hint">{t('passwordHint')}</div>
-        <button type="submit" className="auth-btn" disabled={loading}>
-          {loading ? t('registering') : t('register')}
-        </button>
-      </form>
+      ) : (
+        <>
+          {(error || localError) && <div className="auth-error">{error || localError}</div>}
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <input
+                type="text"
+                className="auth-input"
+                placeholder={t('username')}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <input
+                type="password"
+                className="auth-input"
+                placeholder={t('password')}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <input
+                type="password"
+                className="auth-input"
+                placeholder={t('confirmPassword')}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="password-hint">{t('passwordHint')}</div>
+            <button type="submit" className="auth-btn" disabled={loading}>
+              {loading ? t('registering') : t('register')}
+            </button>
+          </form>
+        </>
+      )}
       <div className="auth-footer">
         <span>{t('hasAccount')}</span>
         <button className="switch-btn" onClick={onSwitchToLogin}>

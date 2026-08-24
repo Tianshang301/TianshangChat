@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { SERVER_URL, API_URL } from '../config';
+import VoicePlayer from './VoicePlayer';
 
 function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSendVoice, onTyping, onClose, typingUser }) {
   const { t } = useLanguage();
@@ -112,13 +113,10 @@ function PrivateChatPanel({ user, messages, currentUserId, onSendMessage, onSend
           >
             <div className="message-bubble">
               {msg.type === 'voice' ? (
-                <div className="voice-message">
-                  <button className="voice-btn" onClick={() => {
-                    const audio = new Audio(`${SERVER_URL}${msg.audioUrl}`);
-                    audio.play();
-                  }}>▶</button>
-                  <span>{msg.duration}</span>
-                </div>
+                <VoicePlayer
+                  audioUrl={`${SERVER_URL}${msg.audioUrl}`}
+                  duration={msg.duration}
+                />
               ) : (
                 <div className="message-text">{msg.content}</div>
               )}

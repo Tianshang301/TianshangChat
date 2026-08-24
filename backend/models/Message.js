@@ -21,14 +21,15 @@ class Message {
   }
 
   static getHistory(days = 7, limit = 500) {
+    const cutoff = new Date(Date.now() - days * 86400000).toISOString();
     const stmt = db.prepare(`
       SELECT * FROM messages
-      WHERE timestamp >= datetime('now', '-${days} days')
+      WHERE timestamp >= ?
         AND recipient_id IS NULL AND group_id IS NULL
       ORDER BY timestamp ASC
       LIMIT ?
     `);
-    return stmt.all(limit);
+    return stmt.all(cutoff, limit);
   }
 
   static getHistoryBefore(beforeTimestamp, limit = 100) {
@@ -53,14 +54,15 @@ class Message {
   }
 
   static getPrivateHistory(userId1, userId2, days = 30, limit = 100) {
+    const cutoff = new Date(Date.now() - days * 86400000).toISOString();
     const stmt = db.prepare(`
       SELECT * FROM messages
       WHERE ((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?))
-        AND timestamp >= datetime('now', '-${days} days')
+        AND timestamp >= ?
       ORDER BY timestamp ASC
       LIMIT ?
     `);
-    return stmt.all(userId1, userId2, userId2, userId1, limit);
+    return stmt.all(userId1, userId2, userId2, userId1, cutoff, limit);
   }
 
   static getPrivateList(userId, limit = 50) {
@@ -94,14 +96,15 @@ class Message {
   }
 
   static getGroupHistory(groupId, days = 30, limit = 500) {
+    const cutoff = new Date(Date.now() - days * 86400000).toISOString();
     const stmt = db.prepare(`
       SELECT * FROM messages
       WHERE group_id = ?
-        AND timestamp >= datetime('now', '-${days} days')
+        AND timestamp >= ?
       ORDER BY timestamp ASC
       LIMIT ?
     `);
-    return stmt.all(groupId, limit);
+    return stmt.all(groupId, cutoff, limit);
   }
 
   static getGroupHistoryBefore(groupId, beforeTimestamp, limit = 100) {

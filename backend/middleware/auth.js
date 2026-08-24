@@ -1,7 +1,14 @@
 const jwt = require('jsonwebtoken');
 const db = require('../database/db');
+const crypto = require('crypto');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'TianshangChatSecretKey2024';
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
+
+if (!process.env.JWT_SECRET) {
+  console.warn('WARNING: JWT_SECRET environment variable not set. Using ephemeral random key.');
+  console.warn('All existing sessions will be invalidated on server restart.');
+  console.warn('Set JWT_SECRET in .env for persistent sessions.');
+}
 
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;

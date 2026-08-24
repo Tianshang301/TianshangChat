@@ -56,3 +56,6 @@ android/local.properties
 # Capacitor
 android/capacitor/.gradle/
 android/capacitor/build/
+
+# Database (sqlite artifacts)
+backend/database/chat.db*

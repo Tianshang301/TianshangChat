@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { SERVER_URL, API_URL } from '../config';
+import VoicePlayer from './VoicePlayer';
 
 function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, onTyping, onOpenSettings }) {
   const { t } = useLanguage();
@@ -121,13 +122,10 @@ function GroupChat({ group, messages, currentUser, onSendMessage, onSendVoice, o
                 <div className="message-sender">{msg.senderName}</div>
               )}
               {msg.type === 'voice' ? (
-                <div className="voice-message">
-                  <button className="voice-btn" onClick={() => {
-                    const audio = new Audio(`${SERVER_URL}${msg.audioUrl}`);
-                    audio.play();
-                  }}>▶</button>
-                  <span>{msg.duration}</span>
-                </div>
+                <VoicePlayer
+                  audioUrl={`${SERVER_URL}${msg.audioUrl}`}
+                  duration={msg.duration}
+                />
               ) : (
                 <div className="message-text">{msg.content}</div>
               )}

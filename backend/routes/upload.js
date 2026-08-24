@@ -40,7 +40,7 @@ router.post('/avatar', authMiddleware, upload.single('avatar'), (req, res) => {
   res.json({ success: true, url: avatarUrl });
 });
 
-router.post('/voice', authMiddleware, multer({
+const voiceUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
       cb(null, path.join(__dirname, '../uploads/voice'));
@@ -51,8 +51,20 @@ router.post('/voice', authMiddleware, multer({
       cb(null, `voice-${uniqueSuffix}${ext}`);
     }
   }),
-  limits: { fileSize: 10 * 1024 * 1024 }
-}).single('voice'), (req, res) => {
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /webm|wav|mp3|ogg|aac|m4a|opus/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname || mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only audio files are allowed (max 10MB)!'));
+    }
+  }
+});
+
+router.post('/voice', authMiddleware, voiceUpload.single('voice'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }

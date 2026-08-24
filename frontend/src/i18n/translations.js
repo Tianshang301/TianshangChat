@@ -74,7 +74,9 @@ export const translations = {
     joinFailed: 'Failed to join group',
     alreadyInGroup: 'Already in this group',
     privateChat: 'Private Chat',
-    language: 'Language'
+    language: 'Language',
+    registerSuccess: 'Registration successful! You can now log in.',
+    registerFailed: 'Registration failed'
   },
   zh: {
     appName: '天殇网聊',
@@ -151,7 +153,9 @@ export const translations = {
     joinFailed: '加入群聊失败',
     alreadyInGroup: '已在群聊中',
     privateChat: '私聊',
-    language: '语言'
+    language: '语言',
+    registerSuccess: '注册成功！现在可以登录了。',
+    registerFailed: '注册失败'
   },
   ja: {
     appName: '天殇チャット',
@@ -228,7 +232,9 @@ export const translations = {
     joinFailed: 'グループに参加できませんでした',
     alreadyInGroup: 'このグループに参加済みです',
     privateChat: 'DM',
-    language: '言語'
+    language: '言語',
+    registerSuccess: '登録成功！ログインできます。',
+    registerFailed: '登録失敗'
   },
   ko: {
     appName: '천상챗',
@@ -305,7 +311,9 @@ export const translations = {
     joinFailed: '그룹 참가를 실패했습니다',
     alreadyInGroup: '이미 이 그룹에 있습니다',
     privateChat: 'DM',
-    language: '언어'
+    language: '언어',
+    registerSuccess: '회원가입 성공! 로그인할 수 있습니다.',
+    registerFailed: '회원가입 실패'
   },
   tw: {
     appName: '天殤網聊',
@@ -382,7 +390,9 @@ export const translations = {
     joinFailed: '加入群組失敗',
     alreadyInGroup: '已在群組中',
     privateChat: '私聊',
-    language: '語言'
+    language: '語言',
+    registerSuccess: '註冊成功！現在可以登錄了。',
+    registerFailed: '註冊失敗'
   }
 };
 

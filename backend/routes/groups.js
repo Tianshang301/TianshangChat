@@ -22,7 +22,7 @@ router.get('/', authMiddleware, (req, res) => {
 
 router.post('/',
   authMiddleware,
-  body('name').isLength({ min: 1, max: 50 }).trim(),
+  body('name').isLength({ min: 1, max: 50 }).trim().escape(),
   body('memberIds').isArray(),
   (req, res) => {
     try {

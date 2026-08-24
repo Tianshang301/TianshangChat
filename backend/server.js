@@ -1,12 +1,17 @@
+const dotenv = require('dotenv');
+dotenv.config();
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const dotenv = require('dotenv');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const os = require('os');
 
+const { JWT_SECRET, authMiddleware } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
 const uploadRoutes = require('./routes/upload');
 const messageRoutes = require('./routes/messages');
@@ -17,12 +22,9 @@ const User = require('./models/User');
 const Group = require('./models/Group');
 const db = require('./database/db');
 
-dotenv.config();
-
 const app = express();
 const server = http.createServer(app);
 
-const JWT_SECRET = process.env.JWT_SECRET || 'TianshangChatSecretKey2024';
 const PORT = process.env.PORT || 3000;
 
 function getLocalIP() {
@@ -41,8 +43,7 @@ const localIP = getLocalIP();
 
 function isAllowedOrigin(origin) {
   if (!origin) return true;
-  if (origin === 'null') return true;
-  if (origin.startsWith('file://')) return true;
+  if (origin === 'null' || origin.startsWith('file://')) return false;
   
   try {
     const url = new URL(origin);
@@ -94,7 +95,38 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
+}));
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login/register attempts, please try again later.' }
+});
+
+app.use('/api/', apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  next();
+});
+
+app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use((req, res, next) => {
@@ -108,10 +140,9 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/users', userRoutes);
 
-app.get('/api/server-info', (req, res) => {
+app.get('/api/server-info', authMiddleware, (req, res) => {
   res.json({
     success: true,
-    lanIp: localIP,
     port: PORT,
     onlineUsers: onlineUsers.size
   });
@@ -219,11 +250,20 @@ io.on('connection', (socket) => {
     io.emit('receive-message', broadcastMessage);
   });
 
+  function validateUploadPath(url, prefix) {
+    return url && typeof url === 'string' && url.startsWith(prefix);
+  }
+
   // Public voice message
   socket.on('send-voice', (data) => {
     const user = onlineUsers.get(socket.id);
     if (!user) {
       socket.emit('error', { error: 'Not authenticated' });
+      return;
+    }
+
+    if (!validateUploadPath(data.audioUrl, '/uploads/voice/')) {
+      socket.emit('error', { error: 'Invalid audio URL' });
       return;
     }
 
@@ -297,6 +337,11 @@ io.on('connection', (socket) => {
     }
 
     const { recipientId, audioUrl, duration } = data;
+
+    if (!validateUploadPath(audioUrl, '/uploads/voice/')) {
+      socket.emit('error', { error: 'Invalid audio URL' });
+      return;
+    }
     
     const message = Message.create({
       senderId: user.id,
@@ -404,6 +449,11 @@ io.on('connection', (socket) => {
     }
 
     const { groupId, audioUrl, duration } = data;
+
+    if (!validateUploadPath(audioUrl, '/uploads/voice/')) {
+      socket.emit('error', { error: 'Invalid audio URL' });
+      return;
+    }
 
     if (!Group.isMember(groupId, user.id)) {
       socket.emit('error', { error: 'Not a member of this group' });
@@ -543,6 +593,10 @@ io.on('connection', (socket) => {
   socket.on('update-avatar', (avatarUrl) => {
     const user = onlineUsers.get(socket.id);
     if (user) {
+      if (avatarUrl && !validateUploadPath(avatarUrl, '/uploads/avatars/')) {
+        socket.emit('error', { error: 'Invalid avatar URL' });
+        return;
+      }
       User.updateAvatar(user.id, avatarUrl);
       user.avatar = avatarUrl;
       onlineUsers.set(socket.id, user);

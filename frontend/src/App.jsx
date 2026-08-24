@@ -13,6 +13,7 @@ import BottomNav from './components/BottomNav';
 import UserSearchModal from './components/UserSearchModal';
 import JoinGroupModal from './components/JoinGroupModal';
 import RecentChats from './components/RecentChats';
+import VoicePlayer from './components/VoicePlayer';
 import { showNotification } from './utils/notifications';
 import io from 'socket.io-client';
 
@@ -208,10 +209,10 @@ function PublicMessageList({ messages, currentUserId }) {
           <div className="message-content">
             {msg.senderId !== currentUserId && <div className="message-sender">{msg.senderName}</div>}
             {msg.type === 'voice' ? (
-              <div className="voice-message">
-                <button className="voice-btn" onClick={() => new Audio(`${serverUrl}${msg.audioUrl}`).play()}>▶</button>
-                <span>{msg.duration}</span>
-              </div>
+              <VoicePlayer
+                audioUrl={`${serverUrl}${msg.audioUrl}`}
+                duration={msg.duration}
+              />
             ) : (
               <div className="message-text">{msg.content}</div>
             )}
