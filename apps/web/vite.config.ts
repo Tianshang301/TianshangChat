@@ -10,6 +10,7 @@ export default defineConfig({
     alias: {
       '@tianshangchat/crypto': path.resolve(__dirname, '../../packages/crypto/src/index.ts'),
       '@tianshangchat/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
+      '@tianshangchat/plugins-sdk': path.resolve(__dirname, '../../packages/plugins-sdk/src/index.ts'),
     },
   },
   plugins: [

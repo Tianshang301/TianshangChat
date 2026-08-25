@@ -14,6 +14,7 @@ import { openPublicConversation } from '../domain/conversations';
 import { api } from '../data/apiClient';
 import { conversationKey } from '../core/messageStatus';
 import { markStatus } from '../data/messageCache';
+import { initPlugins } from '../plugins/host';
 import { setE2eeSessionContext } from '../domain/messaging';
 import { ensureIdentity } from '../domain/e2ee';
 import { distributeSenderKeys } from '../domain/groups-e2ee';
@@ -89,6 +90,7 @@ export function useChatConnection(
             console.error('[sync] initial catch-up failed:', err),
           );
           await flushOutbox().catch(() => {});
+          await initPlugins().catch((err) => console.warn('[plugins] init failed:', err));
         })();
       },
 

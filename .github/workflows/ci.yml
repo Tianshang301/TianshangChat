@@ -79,6 +79,10 @@ jobs:
       - run: pnpm install --frozen-lockfile --dangerously-allow-all-builds
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      # Server vitest resolves @tianshangchat/shared via package entry (dist),
+      # so workspace deps must be built in this fresh checkout first.
+      - run: pnpm --filter @tianshangchat/shared build
+      - run: pnpm --filter @tianshangchat/crypto build
       # Supertest + temp SQLite: auth/messages/groups/sync/e2ee/upload
       - run: pnpm --filter @tianshangchat/server test
 
