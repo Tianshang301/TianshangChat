@@ -17,6 +17,13 @@ import { bytesEq, fromBase64, toBase64, utf8Encode } from './encoding.js';
 
 const MAX_SKIP = 64;
 
+export interface PrekeyHeader {
+  /** Initiator identity public key (base64). */
+  ik: string;
+  /** Initiator ephemeral public key (base64). */
+  ek: string;
+}
+
 export interface RatchetHeaderJson {
   /** Sender's current ratchet public key (base64). */
   dh: string;
@@ -24,6 +31,8 @@ export interface RatchetHeaderJson {
   n: number;
   /** Length of the previous sending chain. */
   pn: number;
+  /** Present ONLY on the first message of a session (X3DH bundle for Bob). */
+  prekey?: PrekeyHeader;
 }
 
 export interface RatchetMessage {
@@ -90,7 +99,11 @@ export function initAsResponder(
   };
 }
 
-export function encrypt(state: RatchetState, plaintext: Uint8Array, aad?: Uint8Array): RatchetMessage {
+export function encrypt(
+  state: RatchetState,
+  plaintext: Uint8Array,
+  aad?: Uint8Array,
+): RatchetMessage {
   if (!state.sendChainKey) throw new Error('E2EE: no sending chain (await a reply first)');
   const { messageKey, nextChainKey } = kdfMessageKey(state.sendChainKey);
   state.sendChainKey = nextChainKey;

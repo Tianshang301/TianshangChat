@@ -1,3 +1,4 @@
+import type { PrekeyHeader } from './ratchet.js';
 import {
   decrypt as ratchetDecrypt,
   encrypt as ratchetEncrypt,
@@ -45,9 +46,20 @@ export function isEnvelope(content: string | null | undefined): boolean {
   return typeof content === 'string' && content.startsWith(`${ENVELOPE_PREFIX}.`);
 }
 
-/** Encrypts an inner payload JSON with the session's Double Ratchet into a wire string. */
-export function sealWithRatchet(state: RatchetState, inner: InnerPayload): string {
+/**
+ * Encrypts an inner payload JSON with the session's Double Ratchet into a wire string.
+ * When \options.prekey\ is provided (session initiator's first message), the X3DH
+ * header is embedded so the responder can derive the shared secret before opening.
+ */
+export function sealWithRatchet(
+  state: RatchetState,
+  inner: InnerPayload,
+  options?: { prekey?: PrekeyHeader },
+): string {
   const msg = ratchetEncrypt(state, utf8Encode(JSON.stringify(inner)));
+  if (options?.prekey) {
+    msg.header.prekey = options.prekey;
+  }
   return [
     ENVELOPE_PREFIX,
     toBase64(utf8Encode(JSON.stringify(msg.header))),
