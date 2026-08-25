@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { SERVER_URL } from '../../config';
 import VoicePlayer from './VoicePlayer';
-import type { GroupDetail, MessageDTO, UserSummary } from '@tianshangchat/shared';
+import { isEnvelope } from '@tianshangchat/crypto';
+import type { StoreMessage } from '../../state/chatStore';
+import type { GroupDetail, UserSummary } from '@tianshangchat/shared';
 
 function GroupChat({
   group,
@@ -14,7 +16,7 @@ function GroupChat({
   onOpenSettings,
 }: {
   group: GroupDetail;
-  messages: MessageDTO[];
+  messages: StoreMessage[];
   currentUser?: UserSummary | null;
   onSendMessage: (content: string) => void;
   onSendVoice: (url: string, duration: string) => void;
@@ -145,7 +147,7 @@ function GroupChat({
               {msg.type === 'voice' ? (
                 <VoicePlayer audioUrl={`${SERVER_URL}${msg.audioUrl ?? ''}`} duration={msg.duration} />
               ) : (
-                <div className="message-text">{msg.content}</div>
+                <div className={"message-text"}>{renderGroupText(msg)}</div>
               )}
               <div className="message-time">{formatTime(msg.timestamp)}</div>
             </div>
@@ -175,6 +177,13 @@ function GroupChat({
       </form>
     </div>
   );
+}
+
+
+function renderGroupText(m: StoreMessage): string {
+  if (m.decrypted?.body !== undefined) return m.decrypted.body;
+  if (isEnvelope(m.content)) return m.secureFailed ? '🔒 无法解密' : '🔒 解密中…';
+  return m.content ?? '';
 }
 
 export default GroupChat;

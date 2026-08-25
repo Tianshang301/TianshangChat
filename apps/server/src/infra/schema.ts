@@ -109,3 +109,24 @@ export const groupMembers = sqliteTable(
     index('idx_group_members_user').on(t.userId),
   ],
 );
+
+/**
+ * E2EE prekey bundles (Phase 3). One active bundle per user (single-device
+ * model for now); contents are public keys only — never private material.
+ */
+export const e2eeBundles = sqliteTable('e2ee_bundles', {
+  userId: integer('user_id')
+    .primaryKey()
+    .references(() => users.id),
+  /** X25519 identity public key. */
+  ikPub: text('ik_pub').notNull(),
+  /** Ed25519 signing public key (verifies spk_sig). */
+  edPub: text('ed_pub').notNull(),
+  /** Signed prekey X25519 public key. */
+  spkPub: text('spk_pub').notNull(),
+  /** Ed25519 signature over the signed-prekey context||spkPub. */
+  spkSig: text('spk_sig').notNull(),
+  updatedAt: text('updated_at')
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});

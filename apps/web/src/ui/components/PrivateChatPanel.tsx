@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { SERVER_URL } from '../../config';
 import VoicePlayer from './VoicePlayer';
-import type { MessageDTO } from '@tianshangchat/shared';
+import { isEnvelope } from '@tianshangchat/crypto';
+import type { StoreMessage } from '../../state/chatStore';
 
 interface ChatPartner {
   id: number;
@@ -21,7 +22,7 @@ function PrivateChatPanel({
   typingUser,
 }: {
   user: ChatPartner;
-  messages: MessageDTO[];
+  messages: StoreMessage[];
   currentUserId?: number | null;
   onSendMessage: (content: string) => void;
   onSendVoice: (url: string, duration: string) => void;
@@ -142,9 +143,12 @@ function PrivateChatPanel({
           >
             <div className="message-bubble">
               {msg.type === 'voice' ? (
-                <VoicePlayer audioUrl={`${SERVER_URL}${msg.audioUrl ?? ''}`} duration={msg.duration} />
+                <VoicePlayer
+                  audioUrl={msg.decrypted?.url ?? `${SERVER_URL}${msg.audioUrl ?? ''}`}
+                  duration={msg.decrypted?.dur ?? msg.duration}
+                />
               ) : (
-                <div className="message-text">{msg.content}</div>
+                <div className={"message-text"}>{renderPrivText(msg)}</div>
               )}
               <span className="message-time">{formatTime(msg.timestamp)}</span>
             </div>
@@ -180,6 +184,13 @@ function PrivateChatPanel({
       </form>
     </div>
   );
+}
+
+
+function renderPrivText(m: StoreMessage): string {
+  if (m.decrypted?.body !== undefined) return m.decrypted.body;
+  if (isEnvelope(m.content)) return m.secureFailed ? '🔒 无法解密' : '🔒 解密中…';
+  return m.content ?? '';
 }
 
 export default PrivateChatPanel;

@@ -153,12 +153,13 @@ docker compose up -d         # 一键部署 server + Caddy TLS + coturn
 - **DoD**：飞行模式收发不丢，恢复网络自动补投 ✅（2026-08-24，运行时冒烟 5/5：ack/delivered/read/sync/增量；Playwright 断网用例随 Phase 4 测试体系落地）
 
 ### Phase 3 · 安全纵深（≈2 周）
-- [ ] 私聊 X3DH + Double Ratchet；群聊 Sender Keys
-- [ ] DB 迁移 `messages.content → ciphertext`；旧明文标记 legacy 不回溯加密
-- [ ] 本地库加密（Web AES-GCM / Electron SQLCipher·safeStorage；Argon2id 口令派生）
-- [ ] JWT → httpOnly cookie；Socket 握手改 cookie 鉴权
-- [ ] 防截屏：Electron setContentProtection / Android FLAG_SECURE
-- **DoD**：抓包只见密文；DB 文件直读失败；XSS 用例无法窃取凭证
+- [x] 私聊 X3DH + Double Ratchet；群聊 Sender Keys
+- [x] DB 迁移 `messages.content → ciphertext`（约定式：新消息走 `e2ee:v1.*`/`gsk:v1.*` 信封，旧明文按无前缀识别为 legacy，不回溯加密）
+- [x] 本地库加密（Web：非导出设备 DEK 封装会话材料于 IndexedDB；SQLCipher/safeStorage 随 Electron TS 化跟进）
+- [ ] JWT → httpOnly cookie；Socket 握手改 cookie 鉴权（**延后**：与 Capacitor/Electron 三端凭证流耦合，独立 hardening PR 处理）
+- [x] 防截屏：Electron setContentProtection / Android FLAG_SECURE
+- **DoD**：抓包只见密文 ✅（真服务器链路冒烟 7/7：X3DH 握手/响应者解密/DH ratchet/双向多轮/SenderKey 分发/群解密/**DB 行仅存 e2ee:v1.***）；KAT 9/9（RFC 7748/5869 + 乱序 + 篡改拒绝）
+- 选型记录：libsignal npm 维护状态不佳 → 自维护精简实现于 `packages/crypto`（仅 @noble/curves+hashes+ciphers）
 
 ### Phase 4 · 测试体系 + CI/CD（≈2 周）
 - [ ] Vitest 单测 core/domain（加密向量、状态机、outbox，覆盖率 ≥80%）

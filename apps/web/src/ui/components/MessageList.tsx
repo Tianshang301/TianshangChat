@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { SERVER_URL } from '../../config';
-import type { MessageDTO } from '@tianshangchat/shared';
+
+import { isEnvelope } from '@tianshangchat/crypto';
+import type { StoreMessage } from '../../state/chatStore';
 
 interface GroupedItem {
   key: string;
   kind: 'date' | 'message';
   date?: string;
-  message?: MessageDTO;
+  message?: StoreMessage;
 }
 
 function MessageList({
   messages,
   currentUserId,
 }: {
-  messages: MessageDTO[];
+  messages: StoreMessage[];
   currentUserId?: number | null;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -26,12 +28,13 @@ function MessageList({
     }
   }, [messages]);
 
-  const playVoice = (message: MessageDTO) => {
+  const playVoice = (message: StoreMessage) => {
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    if (!message.audioUrl) return;
-    const audio = new Audio(`${SERVER_URL}${message.audioUrl}`);
+    const src = message.decrypted?.url ?? (message.audioUrl ? `${SERVER_URL}${message.audioUrl}` : null);
+    if (!src) return;
+    const audio = new Audio(src);
     audioRef.current = audio;
     audio.onended = () => setPlayingId(null);
     audio.onerror = () => setPlayingId(null);
@@ -50,6 +53,12 @@ function MessageList({
       return 'Today';
     }
     return date.toLocaleDateString();
+  };
+
+  const renderText = (m: StoreMessage): string => {
+    if (m.decrypted?.body !== undefined) return m.decrypted.body;
+    if (isEnvelope(m.content)) return m.secureFailed ? '🔒 无法解密' : '🔒 解密中…';
+    return m.content ?? '';
   };
 
   const groupedMessages: GroupedItem[] = [];
@@ -75,7 +84,7 @@ function MessageList({
           );
         }
 
-        const message = item.message as MessageDTO;
+        const message = item.message as StoreMessage;
         const isOwn = message.senderId === currentUserId;
 
         return (
@@ -104,10 +113,10 @@ function MessageList({
                       <div key={i} className="wave-bar" style={{ animationDelay: `${i * 0.1}s` }}></div>
                     ))}
                   </div>
-                  <span className="voice-duration">{message.duration}</span>
+                  <span className={"voice-duration"}>{message.decrypted?.dur ?? message.duration}</span>
                 </div>
               ) : (
-                <div className="message-text">{message.content}</div>
+                <div className={"message-text"}>{renderText(message)}</div>
               )}
               <div className="message-time">{formatTime(message.timestamp)}</div>
             </div>

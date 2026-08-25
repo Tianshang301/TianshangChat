@@ -15,6 +15,7 @@ import { errorHandler, notFoundHandler } from './api/error.middleware.js';
 import authRoutes from './api/routes/auth.routes.js';
 import usersRoutes from './api/routes/users.routes.js';
 import syncRoutes from './api/routes/sync.routes.js';
+import e2eeRoutes from './api/routes/e2ee.routes.js';
 import messagesRoutes from './api/routes/messages.routes.js';
 import groupsRoutes from './api/routes/groups.routes.js';
 import uploadRoutes from './api/routes/upload.routes.js';
@@ -138,6 +139,7 @@ app.use('/api/messages', messagesRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/sync', syncRoutes);
+app.use('/api/e2ee', e2eeRoutes);
 
 app.get('/api/server-info', authMiddleware, (_req, res) => {
   res.json({ success: true, port: config.port, onlineUsers: presence.size });

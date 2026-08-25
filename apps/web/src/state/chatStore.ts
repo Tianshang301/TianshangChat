@@ -8,8 +8,22 @@ export interface ChatPartner {
   avatar: string | null;
 }
 
+/** Decrypted view attached by the E2EE layer for rendering. */
+export interface DecryptedView {
+  kind: 'text' | 'voice';
+  body?: string;
+  /** Object-URL of the decrypted voice blob (E2EE voice only). */
+  url?: string;
+  dur?: string | number;
+}
+
 /** Wire message + local delivery lifecycle annotation. */
-export type StoreMessage = MessageDTO & { status?: MessageStatus };
+export type StoreMessage = MessageDTO & {
+  status?: MessageStatus;
+  decrypted?: DecryptedView;
+  /** True when an E2EE envelope could not be opened (missing session/keys). */
+  secureFailed?: boolean;
+};
 
 interface ChatState {
   currentUser: UserSummary | null;

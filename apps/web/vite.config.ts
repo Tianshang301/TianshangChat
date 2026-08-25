@@ -1,8 +1,17 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import path from 'node:path';
 
 export default defineConfig({
+  resolve: {
+    // Workspace packages are consumed from TS source so Rollup sees real ESM
+    // exports (CJS interop on the built dist misses named exports).
+    alias: {
+      '@tianshangchat/crypto': path.resolve(__dirname, '../../packages/crypto/src/index.ts'),
+      '@tianshangchat/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
+    },
+  },
   plugins: [
     react(),
     VitePWA({
