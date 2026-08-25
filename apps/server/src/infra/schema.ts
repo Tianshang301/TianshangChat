@@ -130,3 +130,27 @@ export const e2eeBundles = sqliteTable('e2ee_bundles', {
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
 });
+
+/**
+ * Web Push subscriptions (Phase 5). One row per browser/endpoint; payloads are
+ * encrypted per-subscription by the web-push library using these keys.
+ */
+export const pushSubscriptions = sqliteTable(
+  'push_subscriptions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id),
+    endpoint: text('endpoint').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: text('created_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    uniqueIndex('uq_push_endpoint').on(t.endpoint),
+    index('idx_push_user').on(t.userId),
+  ],
+);

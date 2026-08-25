@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import { observeOutgoing, runCommand } from '../../plugins/host';
+import { showNotification } from '../../utils/notifications';
 
 function MessageInput({
   onSendMessage,
@@ -12,12 +14,28 @@ function MessageInput({
   const [message, setMessage] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim()) {
-      onSendMessage(message);
-      setMessage('');
+    const raw = message;
+    if (!raw.trim()) return;
+
+    // Plugin slash-commands intercept the composer.
+    if (raw.startsWith('/')) {
+      const handled = await runCommand(raw, (text) => void showNotification('插件', text));
+      if (handled) {
+        setMessage('');
+        return;
+      }
     }
+
+    let toSend = raw;
+    try {
+      toSend = await observeOutgoing(raw);
+    } catch (err) {
+      console.warn('[plugins] transform failed:', err);
+    }
+    onSendMessage(toSend);
+    setMessage('');
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,7 +56,9 @@ function MessageInput({
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flex: 1, gap: 12, position: 'relative' }}>
+    <form onSubmit={(e) => {
+    void handleSubmit(e);
+  }} style={{ display: 'flex', flex: 1, gap: 12, position: 'relative' }}>
       <div style={{ position: 'relative' }}>
         <button
           type="button"

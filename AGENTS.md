@@ -169,11 +169,12 @@ docker compose up -d         # 一键部署 server + Caddy TLS + coturn
 - **DoD**：CI 全绿方可合并 ✅（PR #6 起生效）；`docker compose up -d` 一条命令拉起完整部署 ✅
 
 ### Phase 5 · PWA 完善 + 插件系统（≈2 周）
-- [ ] PWA 安装体验 + Push API(VAPID)；产出"PWA 替代 Capacitor"可行性报告
-- [ ] `plugins-sdk`：生命周期钩子 + 能力注册表
-- [ ] 示例插件：plugin-translate(WASM 本地翻译)、plugin-ai(ONNX 端侧接口预留)
+- [x] PWA 安装体验 + Push API(VAPID)；产出"PWA 替代 Capacitor"可行性报告（`docs/pwa-vs-capacitor.md`，结论：混合策略，Capacitor 壳保留）
+- [x] `plugins-sdk`：生命周期钩子 + 能力注册表（manifest Zod schema、四类权限闸门、settings 存储、斜杠命令/消息观察/出站变换钩子；宿主 `apps/web/src/plugins/host.ts`）
+- [x] 示例插件：`plugins/ai-assistant`（`/ai` 提问 + `/translate` 中英互译，走本地 Ollama 等 OpenAI 兼容端点——本地 AI 接口已预留，WASM/ONNX 端侧推理留作后续增强）
 - [ ] Electron 主进程接入共享 `packages/core`
-- **DoD**：第三方插件无需改动宿主即可注册能力
+- **DoD**：第三方插件无需改动宿主即可注册能力 ✅（registry.json 动态发现 + ESM 动态 import，Settings 面板可见插件清单与失败态）
+- 附带修复：Phase 4 遗留缺口 —— server/web 包缺 `"test": "vitest run"` script 导致 CI 测试步空转，本 PR 补齐（38 用例真实入闸）
 
 ### 风险登记
 | 风险 | 缓解 |

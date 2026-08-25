@@ -22,6 +22,13 @@
       "when": 1787618087787,
       "tag": "0002_robust_umar",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787666005733,
+      "tag": "0003_funny_tattoo",
+      "breakpoints": true
     }
   ]
 }

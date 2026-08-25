@@ -1,0 +1,3 @@
+[
+  { "id": "ai-assistant", "entry": "/plugins/ai-assistant/index.js", "enabled": true }
+]

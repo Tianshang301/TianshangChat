@@ -17,6 +17,7 @@ import groupsRoutes from './api/routes/groups.routes.js';
 import uploadRoutes from './api/routes/upload.routes.js';
 import syncRoutes from './api/routes/sync.routes.js';
 import e2eeRoutes from './api/routes/e2ee.routes.js';
+import pushRoutes from './api/routes/push.routes.js';
 
 
 const log = createLogger('server');
@@ -129,6 +130,7 @@ export function createApp(options?: { onlineUsers?: OnlineCountSource }): expres
   app.use('/api/users', usersRoutes);
   app.use('/api/sync', syncRoutes);
   app.use('/api/e2ee', e2eeRoutes);
+app.use('/api/push', pushRoutes);
 
   app.get('/api/server-info', authMiddleware, (_req, res) => {
     res.json({

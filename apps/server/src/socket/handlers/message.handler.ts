@@ -6,6 +6,7 @@ import {
   validateUploadPath,
 } from '@tianshangchat/shared';
 import { createMessage, markDelivered } from '../../data/message.repo.js';
+import { sendPushToUser } from '../../api/routes/push.routes.js';
 import { presence, type ChatSocket } from './presence.js';
 import { safeHandler } from './safe.js';
 
@@ -107,7 +108,6 @@ export function registerMessageHandlers(
       const user = requireUser(socket);
       if (!user) return;
 
-      console.log('[dbg] private send entry', JSON.stringify(data));
       const { recipientId, content } = data;
 
       const message = createMessage({
@@ -141,6 +141,12 @@ export function registerMessageHandlers(
         recipientSocket.emit('receive-private-message', payload);
         markDelivered([message.id], recipientId, null);
         deliveredNow = true;
+      } else {
+        // Recipient offline: Web Push (no-op when VAPID is not configured).
+        void sendPushToUser(recipientId, {
+          title: `私聊消息 · ${user.username}`,
+          body: content.slice(0, 120),
+        });
       }
       if (deliveredNow) {
         socket.emit('message-status', { statuses: [{ id: message.id, status: 'delivered' }] });
@@ -196,6 +202,12 @@ export function registerMessageHandlers(
         recipientSocket.emit('receive-private-message', payload);
         markDelivered([message.id], recipientId, null);
         deliveredNow = true;
+      } else {
+        // Recipient offline: Web Push (no-op when VAPID is not configured).
+        void sendPushToUser(recipientId, {
+          title: `私聊消息 · ${user.username}`,
+          body: '收到一条语音消息',
+        });
       }
       if (deliveredNow) {
         socket.emit('message-status', { statuses: [{ id: message.id, status: 'delivered' }] });

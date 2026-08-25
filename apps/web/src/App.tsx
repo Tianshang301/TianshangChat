@@ -24,6 +24,9 @@ import UserSearchModal from './ui/components/UserSearchModal';
 import JoinGroupModal from './ui/components/JoinGroupModal';
 import RecentChats from './ui/components/RecentChats';
 import VoicePlayer from './ui/components/VoicePlayer';
+import { PwaIndicators } from './ui/components/PwaIndicators';
+import { listLoadedPlugins } from './plugins/host';
+import { subscribePush, unsubscribePush } from './core/push';
 
 const isAndroid = typeof window !== 'undefined' && window.Capacitor !== undefined;
 
@@ -549,6 +552,7 @@ function AppContent() {
 
   return (
     <>
+      <PwaIndicators />
       {isAndroid ? (
         <div className="app-container">
           <div className="main-chat-area">{renderMobileContent()}</div>
@@ -622,11 +626,71 @@ function AppContent() {
 
 function SettingsPanel() {
   const { t, language, setLanguage, languages, languageNames } = useLanguage();
-  const { logout } = useAuth();
+  const { logout, token } = useAuth();
+  const [pushState, setPushState] = useState<string>('idle');
+  const [plugins] = useState(() => listLoadedPlugins());
+
+  const togglePush = async () => {
+    if (!token) return;
+    setPushState('working');
+    try {
+      if (localStorage.getItem('push:enabled') === '1') {
+        await unsubscribePush(token);
+        localStorage.removeItem('push:enabled');
+        setPushState('已关闭');
+      } else {
+        const result = await subscribePush(token);
+        localStorage.setItem('push:enabled', result === 'subscribed' ? '1' : '0');
+        setPushState(
+          result === 'subscribed'
+            ? '已开启'
+            : result === 'disabled'
+              ? '服务器未启用推送'
+              : result === 'denied'
+                ? '权限被拒绝'
+                : '浏览器不支持',
+        );
+      }
+    } catch (err) {
+      setPushState(`失败：${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
 
   return (
     <div className="settings-panel">
       <h2>{t('settings')}</h2>
+
+      <div className="settings-section">
+        <label>桌面推送通知</label>
+        <div className="language-options">
+          <button
+            className="lang-option"
+            onClick={() => void togglePush()}
+            disabled={pushState === 'working'}
+          >
+            {localStorage.getItem('push:enabled') === '1' ? '关闭' : '开启'}
+          </button>
+          {pushState !== 'idle' && pushState !== 'working' && (
+            <span style={{ marginLeft: 8 }}>{pushState}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <label>插件（{plugins.length}）</label>
+        {plugins.length === 0 ? (
+          <div>暂无插件 — 放置于 /plugins/registry.json</div>
+        ) : (
+          plugins.map((p) => (
+            <div key={p.manifest.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0' }}>
+              <strong>{p.manifest.name}</strong>
+              <span style={{ opacity: 0.7 }}>v{p.manifest.version}</span>
+              {p.error && <span style={{ color: 'crimson' }}>加载失败</span>}
+            </div>
+          ))
+        )}
+      </div>
+
       <div className="settings-section">
         <label>{t('language')}</label>
         <div className="language-options">

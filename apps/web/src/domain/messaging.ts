@@ -21,6 +21,7 @@ import {
 } from '../core/messageStatus';
 import { showNotification } from '../utils/notifications';
 import { isEnvelope, openPrivateIncoming, sealPrivateOutgoing, storePeerSenderKey } from './e2ee';
+import { emitObserved, observeOutgoing } from '../plugins/host';
 import { buildSkreq, maybeHandleSkreq, openGroupIncoming } from './groups-e2ee';
 
 type SendEvent = Parameters<typeof emitWithAck>[0];
@@ -279,8 +280,14 @@ async function execute(plan: SendPlan): Promise<SendOutcome> {
 /* Public send API                                                     */
 /* ------------------------------------------------------------------ */
 
-export function sendText(scope: ConversationScope, content: string): Promise<SendOutcome> {
+export function sendText(scope: ConversationScope, rawContent: string): Promise<SendOutcome> {
   return (async () => {
+    let content = rawContent;
+    try {
+      content = await observeOutgoing(content);
+    } catch (err) {
+      console.warn('[plugins] outgoing transform failed:', err);
+    }
     const wire = await wireTextContent(scope, content);
     const plan = buildPlans(scope, 'text', wire)[0]!;
     // For private sends the local view must hold PLAINTEXT.
@@ -391,7 +398,17 @@ export async function ingestIncoming(msg: MessageDTO): Promise<'shown' | 'hidden
   await putMessages([{ msg: { ...storeMsg }, scope }]);
   s.appendMessage(key, storeMsg);
 
-  if (msg.senderId === self.id) return 'shown';
+  const viewForPlugins = {
+    scope: scope.kind as 'public' | 'private' | 'group',
+    senderId: msg.senderId,
+    senderName: msg.senderName,
+    body: storeMsg.decrypted?.body ?? msg.content ?? undefined,
+  };
+
+  if (msg.senderId === self.id) {
+    emitObserved(viewForPlugins);
+    return 'shown';
+  }
 
   const isOpen =
     key === 'public' ||
@@ -409,10 +426,12 @@ export async function ingestIncoming(msg: MessageDTO): Promise<'shown' | 'hidden
       s.bumpUnreadGroup(scope.groupId);
       void showNotification('群聊', `${msg.senderName}: ${preview}`);
     }
+    emitObserved(viewForPlugins);
     return 'shown';
   }
 
   acknowledgeVisible([msg.id], scope);
+  emitObserved(viewForPlugins);
   return 'shown';
 }
 
