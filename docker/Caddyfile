@@ -1,0 +1,13 @@
+# TianshangChat edge proxy.
+# Production (default): automatic HTTPS via Let's Encrypt for $DOMAIN.
+{$TLS_OFF} {
+	# LAN / local development mode: plain HTTP on the given port.
+	:8080 {
+		reverse_proxy server:3000
+	}
+}
+
+{$DOMAIN} {
+	tls {$EMAIL}
+	reverse_proxy server:3000
+}

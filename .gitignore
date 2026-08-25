@@ -56,3 +56,7 @@ android/local.properties
 # Database (sqlite artifacts)
 apps/server/database/chat.db*
 apps/server/data/
+
+# Playwright
+test-results/
+playwright-report/

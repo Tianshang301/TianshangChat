@@ -193,6 +193,19 @@ function ChatLayout() {
           onDeleteGroup={() => void groupUseCases.remove(groupSettingsGroup.id)}
         />
       )}
+
+      {useUiStore.getState().showCreateGroup && (
+        <CreateGroupModal
+          users={users}
+          currentUser={currentUser}
+          onClose={() => useUiStore.getState().setShowCreateGroup(false)}
+          onCreate={(name, memberIds) => {
+            void import('./data/socketAdapter').then(({ getSocket }) => {
+              getSocket()?.emit('create-group', { name, memberIds });
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
