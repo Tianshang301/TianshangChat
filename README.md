@@ -1,5 +1,11 @@
 # TianshangChat
 
+[![CI](https://github.com/Tianshang301/TianshangChat/actions/workflows/ci.yml/badge.svg)](https://github.com/Tianshang301/TianshangChat/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Node](https://img.shields.io/badge/node-%E2%89%A522-339933?logo=node.js&logoColor=white)
+![pnpm](https://img.shields.io/badge/pnpm-11-F69220?logo=pnpm&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+
 - en [English](README.md)
 - zh_CN [简体中文](readme/README.zh_CN.md)
 - zh_TW [繁體中文](readme/README.zh_TW.md)
