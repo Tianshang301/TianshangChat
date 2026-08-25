@@ -1,6 +1,9 @@
 # TianshangChat server image
-# Multi-stage: install → build (turbo) → production deploy via pnpm --filter.
+# Multi-stage: install → build (turbo) → runtime.
 # Base is Debian (glibc) so better-sqlite3 prebuilt binaries download cleanly.
+#
+# NOTE: runtime currently ships the full installed workspace for reliability;
+# a pruned single-package image is tracked as a follow-up optimization.
 
 FROM node:22-bookworm-slim AS base
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -21,7 +24,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts \
  && pnpm rebuild better-sqlite3 bcrypt esbuild
 
 # ------------------------------------------------------------------
-# build: shared + server TS compilation
+# build: compile all TS packages (crypto → shared → server)
 # ------------------------------------------------------------------
 FROM deps AS build
 COPY tsconfig.base.json turbo.json ./
@@ -30,11 +33,10 @@ COPY packages/crypto packages/crypto
 COPY apps/server apps/server
 RUN pnpm --filter @tianshangchat/crypto build \
  && pnpm --filter @tianshangchat/shared build \
- && pnpm --filter @tianshangchat/server db:generate --if-present || true \
  && pnpm --filter @tianshangchat/server build
 
 # ------------------------------------------------------------------
-# runtime: pruned production deploy
+# runtime: full workspace with built artifacts; run from apps/server
 # ------------------------------------------------------------------
 FROM base AS runtime
 WORKDIR /repo
@@ -43,9 +45,8 @@ COPY --from=build /repo/packages/shared/dist packages/shared/dist
 COPY --from=build /repo/packages/crypto/dist packages/crypto/dist
 COPY --from=build /repo/apps/server/drizzle apps/server/drizzle
 COPY --from=build /repo/apps/server/dist apps/server/dist
-RUN pnpm --filter @tianshangchat/server... --prod deploy /out
 
-WORKDIR /out
+WORKDIR /repo/apps/server
 ENV NODE_ENV=production
 EXPOSE 3000
 
