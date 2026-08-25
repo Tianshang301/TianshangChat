@@ -28,7 +28,8 @@ COPY tsconfig.base.json turbo.json ./
 COPY packages/shared packages/shared
 COPY packages/crypto packages/crypto
 COPY apps/server apps/server
-RUN pnpm --filter @tianshangchat/shared build \
+RUN pnpm --filter @tianshangchat/crypto build 
+ && pnpm --filter @tianshangchat/shared build \
  && pnpm --filter @tianshangchat/server db:generate --if-present || true \
  && pnpm --filter @tianshangchat/server build
 
