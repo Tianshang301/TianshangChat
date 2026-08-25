@@ -224,6 +224,7 @@ docker compose up -d         # 一键部署 server + Caddy TLS + coturn
 
 - **锚点原则：tag 负责记住过去，main 负责走向未来，分支只服务于正在进行的开发。**
 - 基线 tag `v1.0-legacy`（重构起点的最后快照）；此后每个 Phase 达成 DoD 打 `v2.0.0-alpha.<N>`（SemVer）。
+- ⚠️ **验收闸门（2026-08-24 用户指示）**：tag 与 Release 一律**仅在用户对对应 Phase 明确验收通过后**创建；合并进 main 本身不构成打 tag 的理由。未验收期间只推送分支与 main 合并结果。
 - 发布物（APK / Electron installer）一律挂 GitHub Releases 附产物，禁止以二进制形式入库。
 - **禁止为旧代码开长期 legacy 分支**。仅当旧版本仍有外部用户需要持续出补丁时才允许 `maintenance/v1.x`，且必须带明确退役日期。回看历史的方式：`git switch -c <rescue-branch> v1.0-legacy`，或在 GitHub 页面按 tag 浏览源码。
 
