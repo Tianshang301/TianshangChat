@@ -22,7 +22,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --dangerously-allow-all-builds
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: pnpm lint
 
   typecheck:
@@ -37,7 +39,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --dangerously-allow-all-builds
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: pnpm --filter @tianshangchat/shared build
       - run: pnpm typecheck
 
@@ -53,7 +57,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --dangerously-allow-all-builds
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       # crypto KATs (RFC vectors) + web core/cache/store units
       - run: pnpm --filter @tianshangchat/crypto test
       - run: pnpm --filter @tianshangchat/web test
@@ -70,7 +76,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --dangerously-allow-all-builds
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       # Supertest + temp SQLite: auth/messages/groups/sync/e2ee/upload
       - run: pnpm --filter @tianshangchat/server test
 
@@ -87,7 +95,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --dangerously-allow-all-builds
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: pnpm build
 
   docker:
