@@ -15,6 +15,13 @@
       "when": 1787586189618,
       "tag": "0001_bizarre_supreme_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787618087787,
+      "tag": "0002_robust_umar",
+      "breakpoints": true
     }
   ]
 }
