@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.turbo
+**/.turbo
+*.tsbuildinfo
+apps/server/data
+apps/server/uploads
+apps/server/database/*.db*
+apps/web/test-results
+playwright-report
+.git
+.env
+**/.env

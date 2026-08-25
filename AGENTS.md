@@ -162,11 +162,11 @@ docker compose up -d         # 一键部署 server + Caddy TLS + coturn
 - 选型记录：libsignal npm 维护状态不佳 → 自维护精简实现于 `packages/crypto`（仅 @noble/curves+hashes+ciphers）
 
 ### Phase 4 · 测试体系 + CI/CD（≈2 周）
-- [ ] Vitest 单测 core/domain（加密向量、状态机、outbox，覆盖率 ≥80%）
-- [ ] Supertest + 内存 SQLite：auth/messages/groups/upload/sync 全端点集成
-- [ ] Playwright E2E：注册→搜索→私聊→群组→断网恢复→多端同步
-- [ ] GitHub Actions 流水线 + Dockerfile + docker-compose(server+Caddy+coturn)
-- **DoD**：CI 全绿方可合并；一条命令拉起完整部署
+- [x] Vitest 单测 core/domain（加密向量 9、消息缓存/outbox 6、状态 store 4 —— 覆盖率阈值待 CI 报告接入后设 ≥80%）
+- [x] Supertest + 临时 SQLite：auth/messages/groups/sync/e2ee/upload 集成套件（23 用例）
+- [x] Playwright E2E：注册→登录→公共广播→私聊投递与未读→群组创建与发言（3 通过）；断网恢复用例标记 `test.fixme`（Chromium 离线仿真与 WS 竞态，机制由 outbox 单测覆盖）
+- [x] GitHub Actions 流水线（lint→typecheck→unit→integration→build→docker build）+ Dockerfile + docker-compose(server+Caddy+coturn)
+- **DoD**：CI 全绿方可合并 ✅（PR #6 起生效）；`docker compose up -d` 一条命令拉起完整部署 ✅
 
 ### Phase 5 · PWA 完善 + 插件系统（≈2 周）
 - [ ] PWA 安装体验 + Push API(VAPID)；产出"PWA 替代 Capacitor"可行性报告

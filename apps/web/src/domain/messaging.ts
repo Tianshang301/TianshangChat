@@ -416,7 +416,7 @@ export async function ingestIncoming(msg: MessageDTO): Promise<'shown' | 'hidden
   return 'shown';
 }
 
-async function applyDecrypted(target: StoreMessage, inner: import('@tianshangchat/crypto').InnerPayload): Promise<void> {
+export async function applyDecrypted(target: StoreMessage, inner: import('@tianshangchat/crypto').InnerPayload): Promise<void> {
   if (inner.t === 'voice' && inner.url && inner.k && inner.iv) {
     target.decrypted = { kind: 'voice', dur: inner.dur };
     try {

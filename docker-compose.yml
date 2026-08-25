@@ -1,0 +1,63 @@
+name: tianshangchat
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      DATABASE_PATH: /data/chat.db
+      UPLOAD_DIR: /uploads
+    volumes:
+      - server-data:/data
+      - server-uploads:/uploads
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - server
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      # Public hostname for automatic TLS. LAN deployments may set
+      # `DOMAIN=:8080` + `TLS_OFF=on` style overrides in the Caddyfile.
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+  coturn:
+    image: coturn/coturn:latest
+    network_mode: host
+    restart: unless-stopped
+    # TURN/STUN relay reserved for future WebRTC features (AGENTS.md §3).
+    command: >
+      -n --realm=tianshangchat --no-cli
+      --listening-port=3478
+      --fingerprint
+      --lt-cred-mech --user=${COTURN_USER:-tianshang}:${COTURN_PASSWORD:-changeme}
+      --no-multicast-peers --no-tlsv1 --no-tlsv1_1
+
+volumes:
+  server-data:
+  server-uploads:
+  caddy-data:
+  caddy-config:

@@ -86,7 +86,7 @@ export async function ensurePrivateSession(
   if (!me) throw new Error('E2EE: local identity missing');
 
   const res = await api.fetchBundle(token, peerId);
-  const init = x3dhInitiate(fromBase64(me.ikPriv as unknown as string), {
+  const init = x3dhInitiate(me.ikPriv, {
     ikPub: fromBase64(res.bundle.ikPub),
     edPub: fromBase64(res.bundle.edPub),
     spkPub: fromBase64(res.bundle.spkPub),
@@ -116,10 +116,7 @@ export async function openPrivateIncoming(
     const me = await loadIdentity();
     if (!me) throw new Error('E2EE: local identity missing');
     const sk = x3dhRespondFrom(me.ikPriv, me.spkPriv, parsed.header.prekey);
-    session = initAsResponder(sk, {
-      priv: fromBase64(me.spkPriv as unknown as string),
-      pub: fromBase64(me.pub.spkPub),
-    });
+    session = initAsResponder(sk, { priv: me.spkPriv, pub: fromBase64(me.pub.spkPub) });
     await saveSession(key, session);
   }
   if (!session || !parsed) throw new Error('E2EE: no session with peer');

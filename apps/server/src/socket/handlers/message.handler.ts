@@ -107,6 +107,7 @@ export function registerMessageHandlers(
       const user = requireUser(socket);
       if (!user) return;
 
+      console.log('[dbg] private send entry', JSON.stringify(data));
       const { recipientId, content } = data;
 
       const message = createMessage({
