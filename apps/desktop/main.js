@@ -28,6 +28,9 @@ function createWindow() {
     }
   });
 
+  // Anti-screencap (AGENTS.md §7.6): block OS-level screen capture of the window.
+  mainWindow.setContentProtection(true);
+
   if (app.isPackaged) {
     const indexPath = path.join(process.resourcesPath, 'dist', 'index.html');
     console.log('Loading production file:', indexPath);

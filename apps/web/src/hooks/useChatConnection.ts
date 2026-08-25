@@ -14,6 +14,9 @@ import { openPublicConversation } from '../domain/conversations';
 import { api } from '../data/apiClient';
 import { conversationKey } from '../core/messageStatus';
 import { markStatus } from '../data/messageCache';
+import { setE2eeSessionContext } from '../domain/messaging';
+import { ensureIdentity } from '../domain/e2ee';
+import { distributeSenderKeys } from '../domain/groups-e2ee';
 
 /**
  * Owns the socket lifecycle for the signed-in user.
@@ -53,10 +56,12 @@ export function useChatConnection(
   useEffect(() => {
     if (!user || !token) return;
 
+    setE2eeSessionContext(token);
     store
       .getState()
       .setCurrentUser({ id: user.id, username: user.username, avatar: user.avatar ?? null });
     setFocusProbe(document.hasFocus());
+    void ensureIdentity(token).catch((err) => console.warn('[e2ee] identity init failed:', err));
 
     const socket = connect(token);
 
@@ -99,7 +104,12 @@ export function useChatConnection(
 
       'group-updated': ({ group }) => store.getState().upsertGroup(group),
 
-      'member-joined': ({ group }) => store.getState().upsertGroup(group),
+      'member-joined': ({ group }) => {
+        store.getState().upsertGroup(group);
+        void api.groupDetail(token, group.id).then((detail) => {
+          if (detail) void distributeSenderKeys(token, detail.id, detail.members.map((m) => m.userId));
+        });
+      },
 
       'member-left': ({ groupId }) => {
         void api.groupDetail(token, groupId).then((detail) => {

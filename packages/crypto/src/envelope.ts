@@ -40,6 +40,10 @@ export interface InnerPayload {
   url?: string;
   dur?: string | number;
   sk?: SenderKeyDistribution;
+  /** Per-file AES key (voice E2EE) — base64. */
+  k?: string;
+  /** Per-file IV — base64. */
+  iv?: string;
 }
 
 export function isEnvelope(content: string | null | undefined): boolean {

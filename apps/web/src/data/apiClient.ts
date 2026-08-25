@@ -136,4 +136,28 @@ export const api = {
       headers: authHeaders(token),
     });
   },
+
+  async publishBundle(
+    token: string,
+    bundle: { ikPub: string; edPub: string; spkPub: string; spkSig: string },
+  ): Promise<void> {
+    await fetch(`${baseUrl}/api/e2ee/bundle`, {
+      method: 'PUT',
+      headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(bundle),
+    });
+  },
+
+  async fetchBundle(token: string, userId: number): Promise<{
+    bundle: { ikPub: string; edPub: string; spkPub: string; spkSig: string };
+  }> {
+    const res = await fetch(`${baseUrl}/api/e2ee/bundle/${userId}`, {
+      headers: authHeaders(token),
+    });
+    if (!res.ok) throw new Error(`bundle fetch failed (${res.status})`);
+    return parse<{
+      success: boolean;
+      bundle: { ikPub: string; edPub: string; spkPub: string; spkSig: string };
+    }>(res);
+  },
 };

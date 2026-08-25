@@ -37,6 +37,8 @@ class ChatDatabase extends Dexie {
   messages!: Table<StoredMessage, number>;
   outbox!: Table<OutboxItem, number>;
   meta!: Table<MetaRow, string>;
+  /** Sealed E2EE blobs (identity / ratchet sessions / sender keys). */
+  e2eeKv!: Table<MetaRow, string>;
 
   constructor() {
     super('tianshangchat');
@@ -46,6 +48,13 @@ class ChatDatabase extends Dexie {
       messages: 'id, convKey, timestamp, [convKey+timestamp]',
       outbox: '++id, nextAttemptAt',
       meta: 'key',
+    });
+    // v2: E2EE sealed key/value store. Values are DEK-sealed ciphertext blobs.
+    this.version(2).stores({
+      messages: 'id, convKey, timestamp, [convKey+timestamp]',
+      outbox: '++id, nextAttemptAt',
+      meta: 'key',
+      e2eeKv: 'key',
     });
   }
 }
